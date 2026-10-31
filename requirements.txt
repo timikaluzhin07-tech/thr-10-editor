@@ -1,0 +1,14 @@
+# THR10 Editor — зависимости (проверено с Python 3.12, 64-bit).
+# python-rtmidi 1.5.8 публикует колёса для Windows только до Python 3.12,
+# поэтому для Windows нужен Python 3.11 или 3.12 (см. README).
+
+# --- приложение ---
+PySide6==6.12.0
+mido==1.3.3
+python-rtmidi==1.5.8
+
+# --- тесты ---
+pytest==9.2.0
+
+# --- сборка .exe ---
+pyinstaller==6.22.3
