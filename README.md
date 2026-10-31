@@ -39,12 +39,25 @@
 |---|---|
 | ![](docs/img/light.png) | ![](docs/img/stage.png) |
 
+## Скачать
+
+**[Последняя версия для Windows → Releases](https://github.com/timikaluzhin07-tech/thr-10-editor/releases/latest)**
+
+* `THR10Editor.exe` — редактор. Установка не нужна: скачайте и запустите.
+* `THR10Probe.exe` — проверка связи с комбиком (запускать первым при
+  проверке на железе, см. [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)).
+
+Программа без цифровой подписи, поэтому Windows может показать «Windows
+защитила ваш компьютер»: **Подробнее → Выполнить в любом случае**.
+Файлы собирает GitHub Actions на Windows из исходников этого репозитория
+(`.github/workflows/build-windows.yml`): тесты, сборка, самопроверка.
+
 ## Установка и запуск (Windows)
 
 Нужно: Windows 10/11, драйвер **Yamaha Steinberg USB**, комбик THR10 /
 THR10C / THR10X / THR5 / THR5A первого поколения.
 
-### Вариант 1. Собрать `.exe`
+### Вариант 1. Собрать `.exe` самостоятельно
 
 1. Установите **Python 3.12 (64-bit)** с [python.org](https://www.python.org/downloads/)
    (галочка «Add python.exe to PATH» не обязательна — используется лаунчер `py`).
