@@ -16,7 +16,8 @@ AbstractButton {
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
     implicitHeight: Theme.size.control
-    implicitWidth: Math.min(row.implicitWidth + Theme.space.md * 2, Theme.space.xxxl * 7)
+    readonly property real dotSize: Theme.space.sm * 1.25
+    implicitWidth: Math.min(label.implicitWidth + dotSize + Theme.space.sm + Theme.space.md * 2, Theme.space.xxxl * 7)
     Accessible.role: Accessible.Button
     Accessible.name: "Связь: " + label
 
@@ -46,10 +47,9 @@ AbstractButton {
         Row {
             id: row
             anchors.centerIn: parent
-            width: Math.min(implicitWidth, root.width - Theme.space.md * 2)
             spacing: Theme.space.sm
             Item {
-                width: Theme.space.sm * 1.25; height: width
+                width: root.dotSize; height: width
                 anchors.verticalCenter: parent.verticalCenter
                 Rectangle {
                     id: halo
@@ -76,8 +76,9 @@ AbstractButton {
                 }
             }
             Label {
+                id: label
                 text: root.label
-                width: Math.min(implicitWidth, row.width - Theme.space.sm * 2.25)
+                width: Math.max(0, Math.min(implicitWidth, root.width - Theme.space.md * 2 - root.dotSize - Theme.space.sm))
                 elide: Text.ElideRight
                 font.pixelSize: Theme.fontSize.sm
                 font.weight: Theme.weight.medium

@@ -52,8 +52,50 @@ ApplicationWindow {
         { group: "Ручка (в фокусе)", seq: "", label: ["Del"], text: "Значение по умолчанию (или двойной клик)" },
         { group: "Ручка (в фокусе)", seq: "", label: ["Enter"], text: "Ввести значение с клавиатуры" },
     ]
-    property var extraShortcuts: []
+    readonly property bool editing: !Backend.stageActive
+    property var extraShortcuts: [
+        { group: "Звук", seq: "Ctrl+Z", text: "Отменить", act: () => Backend.undo(), when: () => win.editing },
+        { group: "Звук", seq: ["Ctrl+Y", "Ctrl+Shift+Z"], label: ["Ctrl+Y", "Ctrl+Shift+Z"], text: "Повторить", act: () => Backend.redo(), when: () => win.editing },
+        { group: "Звук", seq: ["Space", "B"], label: ["Пробел", "B"], text: "A/B: переключить слот", act: () => Backend.toggleAB(), when: () => win.editing },
+        { group: "Звук", seq: "Ctrl+Shift+C", text: "A/B: копировать текущий звук в другой слот", act: () => Backend.copyToOtherSlot(), when: () => win.editing },
+        { group: "Звук", seq: "T", text: "Тап-темп дилея", act: () => Backend.tapTempo() },
+        { group: "Звук", seq: "Ctrl+Shift+R", text: "Случайный звук (рандомайзер)", act: () => Backend.randomize(), when: () => win.editing },
+        { group: "Звук", seq: "Ctrl+M", text: "Морфинг: старт / стоп", act: () => Backend.morphRunning ? Backend.stopMorph() : Backend.startMorph() },
+        { group: "Звук", seq: "Ctrl+L", text: "Автоматизация (LFO): старт / стоп", act: () => Backend.toggleAutomation() },
+        { group: "Библиотека", seq: "Ctrl+S", text: "Сохранить (обновить пресет или добавить в библиотеку)", act: () => win.save(), when: () => win.editing },
+        { group: "Библиотека", seq: "Ctrl+Shift+S", text: "Сохранить как новый пресет", act: () => presetDialog.openNew(), when: () => win.editing },
+        { group: "Библиотека", seq: "Ctrl+F", text: "Поиск в библиотеке", act: () => win.focusSearch(), when: () => win.editing },
+        { group: "Вид", seq: "Ctrl+T", text: "Панель инструментов", act: () => win.toolsVisible = !win.toolsVisible },
+        { group: "Сцена", seq: "F5", text: "Режим «Сцена» для текущего сет-листа", act: () => win.startStage(0), when: () => win.editing },
+        { group: "Сцена", seq: ["Right", "Down", "PgDown", "Space"], label: ["→", "↓", "PgDn", "Пробел"], text: "Следующий пресет", act: () => Backend.stageNext(), when: () => Backend.stageActive },
+        { group: "Сцена", seq: ["Left", "Up", "PgUp", "Backspace"], label: ["←", "↑", "PgUp"], text: "Предыдущий пресет", act: () => Backend.stagePrev(), when: () => Backend.stageActive },
+        { group: "Сцена", seq: "Esc", text: "Выйти из режима «Сцена»", act: () => win.stopStage(), when: () => Backend.stageActive },
+    ]
     readonly property var allShortcuts: shortcutList.concat(extraShortcuts)
+
+    function save() {
+        if (!Backend.saveCurrent())
+            presetDialog.openNew()
+    }
+    signal searchRequested()
+    function focusSearch() {
+        if (compact) sideDrawer.open(); else sidebarVisible = true
+        sidebar.currentIndex = 0
+        searchRequested()
+    }
+    property int visibilityBeforeStage: Window.Windowed
+    function startStage(index) {
+        Backend.startStage(index)
+        if (Backend.stageActive) {
+            visibilityBeforeStage = visibility
+            visibility = Window.FullScreen
+        }
+    }
+    function stopStage() {
+        Backend.stopStage()
+        visibility = visibilityBeforeStage === Window.FullScreen ? Window.FullScreen
+                   : visibilityBeforeStage === Window.Maximized ? Window.Maximized : Window.Windowed
+    }
 
     function toggleSidebar() {
         if (compact)
@@ -80,6 +122,7 @@ ApplicationWindow {
     // ---- раскладка ---------------------------------------------------------
     header: TopBar {
         id: topBar
+        visible: !Backend.stageActive
         sidebarVisible: win.compact ? sideDrawer.opened : win.sidebarVisible
         onToggleSidebar: win.toggleSidebar()
         onOpenRequested: openDialog.open()
@@ -88,12 +131,28 @@ ApplicationWindow {
         onShortcutsRequested: shortcutsDialog.open()
         onLogRequested: logDrawer.opened ? logDrawer.close() : logDrawer.open()
         onConnectionRequested: (anchor) => connPopup.openAt(anchor)
+        hasTools: true
+        toolsVisible: win.toolsVisible
+        onToggleTools: win.toolsVisible = !win.toolsVisible
+        onStageRequested: win.startStage(0)
     }
 
     property var sidebarTabs: [
+        { title: "Библиотека", component: libComp },
         { title: "Комбик", component: slotsComp },
+        { title: "Сет-листы", component: setlistComp },
     ]
     Component { id: slotsComp; SlotsView { onWriteRequested: (i) => { writeDialog.slotIndex = i; writeDialog.open() } } }
+    Component {
+        id: libComp
+        LibraryView {
+            id: lv
+            onEditRequested: (id) => presetDialog.openFor(id)
+            onSaveRequested: win.save()
+            Connections { target: win; function onSearchRequested() { lv.focusSearch() } }
+        }
+    }
+    Component { id: setlistComp; SetlistView { onStageRequested: (i) => win.startStage(i) } }
 
     RowLayout {
         anchors.fill: parent
@@ -147,9 +206,23 @@ ApplicationWindow {
         }
     }
 
-    property var effectExtras: ({})
-    property Component toolsComponent: null
-    property bool toolsVisible: true
+    property var effectExtras: ({ "delay": tapComp })
+    property Component toolsComponent: toolsComp
+    property bool toolsVisible: Backend.getSetting("tools_visible") !== false
+    onToolsVisibleChanged: Backend.setSetting("tools_visible", toolsVisible)
+
+    Component { id: toolsComp; ToolsPanel { } }
+    Component {
+        id: tapComp
+        AppButton {
+            compact: true
+            variant: "ghost"
+            iconName: "tap"
+            text: Backend.tapBpm > 0 ? Backend.tapBpm.toFixed(0) + " BPM" : "Tap"
+            tip: "Тап-темп: нажимайте в такт (клавиша T). Доля: " + Backend.tapSubdivision
+            onPressed: Backend.tapTempo()
+        }
+    }
 
     // Боковая панель на узком окне — выезжающая
     Drawer {
@@ -175,11 +248,17 @@ ApplicationWindow {
         knobMenu.y = pt.y
         knobMenu.open()
     }
-    property list<QtObject> knobMenuExtra
     Menu {
         id: knobMenu
         MenuItem { text: "Сбросить к значению по умолчанию"; onTriggered: win.menuParam.reset() }
-        MenuItem { text: "Ввести значение…"; enabled: false; visible: false }
+        MenuItem {
+            text: win.menuParam && win.menuParam.locked ? "Снять замок рандомайзера" : "Замок для рандомайзера"
+            onTriggered: win.menuParam.toggleLock()
+        }
+        MenuItem {
+            text: win.menuParam && win.menuParam.automated ? "Убрать автоматизацию (LFO)" : "Автоматизация (LFO)"
+            onTriggered: { Backend.toggleLfoForKey(win.menuParam.key); win.toolsVisible = true }
+        }
     }
 
     // ---- всплывающие окна -------------------------------------------------
@@ -199,7 +278,8 @@ ApplicationWindow {
     }
     SettingsDialog { id: settingsDialog }
     ShortcutsDialog { id: shortcutsDialog; shortcuts: win.allShortcuts }
-    ImportDialog { id: importDialog }
+    ImportDialog { id: importDialog; libraryAvailable: true; onAddAllRequested: Backend.addImportedToLibrary() }
+    PresetDialog { id: presetDialog }
     LogDrawer { id: logDrawer }
 
     AppDialog {
@@ -248,6 +328,11 @@ ApplicationWindow {
         target: Backend
         function onToast(kind, text) { toasts.show(kind, text) }
         function onImportReady() { importDialog.open() }
+    }
+
+    StageView {
+        anchors.fill: parent
+        z: 500
     }
 
     Toasts {

@@ -17,11 +17,28 @@ log = logging.getLogger(__name__)
 
 def run_selftest(app: Any, backend: Any, theme: Any, window: Any, seconds: float,
                  screenshot: str, warnings: list[str], exit_code: dict[str, int]) -> None:
+    def has(name: str) -> bool:
+        return hasattr(backend, name)
+
     steps: list[tuple[float, Any]] = [
         (0.6, lambda: backend.param("amp.gain").setValue(80)),
         (0.8, lambda: backend.group("mod").setEnabled(True)),
         (1.0, lambda: backend.demoTurnKnob("amp.treble", 12)),
     ]
+    if has("randomize") and seconds > 2.5:
+        steps += [
+            (1.3, lambda: backend.saveCurrentAs("Selftest", "Тест", "selftest", True, "")),
+            (1.4, lambda: backend.randomize()),
+            (1.5, lambda: backend.undo()),
+            (1.6, lambda: backend.toggleAB()),
+            (1.7, lambda: backend.toggleAB()),
+            (1.8, lambda: backend.addToSetlist(backend.currentPresetId)),
+            (1.9, lambda: backend.tapTempo()),
+            (2.0, lambda: backend.tapTempo()),
+            (2.1, lambda: backend.addLfo("amp.bass")),
+            (2.15, lambda: backend.startAutomation()),
+            (2.3, lambda: backend.stopAutomation()),
+        ]
     for t, fn in steps:
         if t < seconds:
             QTimer.singleShot(int(t * 1000), fn)

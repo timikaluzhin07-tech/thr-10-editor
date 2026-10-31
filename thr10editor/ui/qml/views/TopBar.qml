@@ -10,8 +10,6 @@ Rectangle {
     property bool sidebarVisible: true
     property bool toolsVisible: true
     property bool hasTools: false
-    property alias centerExtra: centerRow.data
-    property alias rightExtra: rightExtraRow.data
     readonly property bool narrow: width < Theme.space.xxxl * 22
 
     signal openRequested()
@@ -22,6 +20,7 @@ Rectangle {
     signal toggleSidebar()
     signal toggleTools()
     signal connectionRequested(Item anchor)
+    signal stageRequested()
 
     implicitHeight: Theme.size.topbar
     color: Theme.c.surface
@@ -104,11 +103,83 @@ Rectangle {
             onClicked: root.connectionRequested(pill)
         }
 
-        Row { id: centerRow; spacing: Theme.space.xs; Layout.alignment: Qt.AlignVCenter }
+        IconButton {
+            iconName: "undo"
+            enabled: Backend.canUndo
+            tip: Backend.canUndo ? "Отменить: " + Backend.undoText : "Отменить"
+            shortcutHint: "Ctrl+Z"
+            onClicked: Backend.undo()
+        }
+        IconButton {
+            iconName: "redo"
+            enabled: Backend.canRedo
+            tip: Backend.canRedo ? "Повторить: " + Backend.redoText : "Повторить"
+            shortcutHint: "Ctrl+Y"
+            onClicked: Backend.redo()
+        }
+
+        // A/B
+        Rectangle {
+            id: ab
+            implicitWidth: abRow.implicitWidth + Theme.space.xs
+            implicitHeight: Theme.size.control
+            radius: Theme.radius.md
+            color: Theme.c.surface2
+            border.width: 1
+            border.color: Theme.c.border
+            ToolTip.visible: abHover.hovered
+            ToolTip.delay: 500
+            ToolTip.text: "A/B-сравнение: Пробел или B. Другой слот: " + Backend.abOtherName
+            HoverHandler { id: abHover }
+            Row {
+                id: abRow
+                anchors.centerIn: parent
+                spacing: Theme.space.xxs
+                Repeater {
+                    model: ["A", "B"]
+                    delegate: AbstractButton {
+                        id: abBtn
+                        required property string modelData
+                        readonly property bool active: Backend.abActive === modelData
+                        width: Theme.size.control - Theme.space.xs
+                        height: Theme.size.control - Theme.space.sm
+                        hoverEnabled: true
+                        focusPolicy: Qt.StrongFocus
+                        onClicked: Backend.selectAB(modelData)
+                        Accessible.name: "Слот " + modelData
+                        background: Rectangle {
+                            radius: Theme.radius.sm
+                            color: abBtn.active ? Theme.c.accent : abBtn.hovered ? Theme.c.surface3 : "transparent"
+                            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+                        }
+                        contentItem: Label {
+                            text: abBtn.modelData
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: Theme.fontSize.md
+                            font.weight: Theme.weight.bold
+                            color: abBtn.active ? Theme.c.accentText : Theme.c.textMuted
+                        }
+                    }
+                }
+            }
+        }
+        IconButton {
+            iconName: "copy"
+            visible: !root.narrow
+            tip: "Скопировать текущий звук в другой слот A/B"
+            shortcutHint: "Ctrl+Shift+C"
+            onClicked: Backend.copyToOtherSlot()
+        }
 
         Item { Layout.fillWidth: true }
 
-        Row { id: rightExtraRow; spacing: Theme.space.xs; Layout.alignment: Qt.AlignVCenter }
+        IconButton {
+            iconName: "stage"
+            tip: "Режим «Сцена» для сет-листа"
+            shortcutHint: "F5"
+            onClicked: root.stageRequested()
+        }
 
         AppButton {
             visible: !root.narrow

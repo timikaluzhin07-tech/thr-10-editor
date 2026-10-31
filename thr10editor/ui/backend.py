@@ -125,6 +125,9 @@ class Backend(QObject):
     def after_state_change(self, changes: Changes, origin: Origin) -> None:
         """Точка расширения (история, A/B)."""
 
+    def after_rename(self, old: str, new: str) -> None:
+        """Точка расширения (история)."""
+
     def _sync_active(self, values: dict[str, int]) -> None:
         for key, item in self._params.items():
             item.sync_active(PARAMS[key].is_active(values))
@@ -220,7 +223,9 @@ class Backend(QObject):
     def presetName(self, name: str) -> None:  # noqa: N802
         name = name.strip() or "Без имени"
         if name != self.state.name:
+            old = self.state.name
             self.state.name = name
+            self.after_rename(old, name)
             self._update_dirty()
             self.presetChanged.emit()
 

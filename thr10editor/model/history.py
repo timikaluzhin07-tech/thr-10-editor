@@ -82,6 +82,8 @@ class History:
             return None
         e = self._undo.pop()
         e.sealed = True
+        if self._undo:
+            self._undo[-1].sealed = True  # после отмены не склеиваем с более старой записью
         self._redo.append(e)
         return Step({k: old for k, (old, _) in e.changes.items()},
                     e.name[0] if e.name else None, e.label)
