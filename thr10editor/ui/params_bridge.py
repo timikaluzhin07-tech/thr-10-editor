@@ -2,37 +2,16 @@
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
+from ..model.taper import LOG_TAPER, from_position, to_position
 from ..protocol.constants import Status
 from ..protocol.params import GROUPS_BY_KEY, PARAMS, Kind, ParamDef, params_in_group
 
 if TYPE_CHECKING:  # pragma: no cover
     from .backend import Backend
-
-# Параметры с логарифмической шкалой ручки (частоты и времена).
-LOG_TAPER = {"delay.time", "delay.highcut", "delay.lowcut", "reverb.time", "reverb.pre",
-             "reverb.lowcut", "reverb.highcut"}
-
-
-def to_position(p: ParamDef, value: int) -> float:
-    """Значение → положение ручки 0..1 (с учётом шкалы)."""
-    if p.span == 0:
-        return 0.0
-    if p.key in LOG_TAPER and p.minimum > 0:
-        return math.log(value / p.minimum) / math.log(p.maximum / p.minimum)
-    return (value - p.minimum) / p.span
-
-
-def from_position(p: ParamDef, x: float) -> int:
-    x = max(0.0, min(1.0, x))
-    if p.key in LOG_TAPER and p.minimum > 0:
-        return p.clamp(p.minimum * (p.maximum / p.minimum) ** x)
-    return p.clamp(p.minimum + x * p.span)
-
 
 class ParamItem(QObject):
     changed = Signal()
