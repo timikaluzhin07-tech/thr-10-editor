@@ -3,35 +3,59 @@ import QtQuick.Shapes
 import QtQuick.Controls.Basic
 import THR10
 
-// Ручка параметра.
+// Ручка параметра (дизайн «Studio Graphite»).
 //  * перетаскивание вверх/вниз (и вбок), Shift — точная подстройка ×0,1;
-//  * колесо мыши (Shift — точно);
-//  * двойной клик — значение по умолчанию;
+//  * колесо мыши (Shift — точно); двойной клик — значение по умолчанию;
 //  * клик по числу — ввод с клавиатуры (в единицах отображения);
 //  * стрелки, PgUp/PgDn, Home/End, Delete (сброс), Enter (ввод) при фокусе;
 //  * правый клик — меню (сброс, замок рандомайзера, LFO).
+// Визуально: шкала с рисками, объёмная лицевая часть, тонкая дуга значения с
+// мягким свечением; короткая вспышка, если значение пришло с комбика.
 FocusScope {
     id: root
 
     property QtObject param: null
     property color accent: Theme.c.accent
     property real diameter: Theme.size.knob
-    property bool dimmed: false
+    property bool dimmed: false          // блок выключен
+    property bool showTicks: true
 
     signal contextRequested(QtObject param, real x, real y)
 
     readonly property bool dragging: dragArea.pressed && dragArea.dragMoved
+    readonly property bool hot: dragArea.containsMouse || dragArea.pressed || root.activeFocus
+    property bool mouseFocus: false
+    onActiveFocusChanged: if (!activeFocus) mouseFocus = false
+
+    // Отображаемое положение с плавным переходом (кроме перетаскивания).
     property real shownPos: param ? param.position : 0
     Behavior on shownPos {
         enabled: !dragArea.pressed
-        NumberAnimation { duration: Theme.motion.fast; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: Theme.motion.value; easing.type: Easing.OutCubic }
+    }
+
+    // Яркость свечения: покой → наведение → перетаскивание; вспышка поверх.
+    property real flashLevel: 0
+    property real glowLevel: root.dimmed ? 0
+                                    : Math.min(1, (root.dragging ? 1 : root.hot ? 0.75 : 0.4) + flashLevel)
+    Behavior on glowLevel { NumberAnimation { duration: Theme.motion.normal } }
+
+    NumberAnimation {
+        id: flashAnim
+        target: root; property: "flashLevel"
+        from: 0.9; to: 0
+        duration: Theme.motion.flash
+        easing.type: Easing.OutQuad
+    }
+    Connections {
+        target: root.param
+        ignoreUnknownSignals: true
+        function onFlash() { flashAnim.restart() }
     }
 
     implicitWidth: Math.max(diameter + Theme.space.sm, labelText.implicitWidth)
     implicitHeight: column.implicitHeight
     activeFocusOnTab: true
-    opacity: dimmed ? 0.55 : 1.0
-    Behavior on opacity { NumberAnimation { duration: Theme.motion.normal } }
 
     Accessible.role: Accessible.Dial
     Accessible.name: param ? param.label : ""
@@ -49,7 +73,7 @@ FocusScope {
             font.pixelSize: Theme.fontSize.xs
             font.weight: Theme.weight.semibold
             font.letterSpacing: Theme.letterSpacing.caps
-            color: root.activeFocus ? root.accent : Theme.c.textMuted
+            color: root.dragging ? root.accent : root.dimmed ? Theme.c.textFaint : Theme.c.textMuted
             Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
         }
 
@@ -59,20 +83,44 @@ FocusScope {
             height: root.diameter
             anchors.horizontalCenter: parent.horizontalCenter
 
+            readonly property real c: width / 2
             readonly property real stroke: Theme.size.knobStroke
-            readonly property real r: width / 2 - stroke / 2 - 1
+            readonly property real tickLen: Math.max(3, width * 0.055)
+            readonly property real arcR: c - tickLen - width * 0.045 - stroke / 2
+            readonly property real faceD: (arcR - stroke / 2 - width * 0.06) * 2
 
-            // фокус
+            // фокус с клавиатуры
             Rectangle {
                 anchors.centerIn: parent
-                width: parent.width + Theme.size.focusRing * 4
+                width: parent.width + Theme.size.focusRing * 3
                 height: width
                 radius: width / 2
                 color: "transparent"
                 border.width: Theme.size.focusRing
                 border.color: Theme.c.focus
-                visible: root.activeFocus && !dragArea.pressed
-                opacity: 0.6
+                opacity: 0.55
+                visible: root.activeFocus && !root.mouseFocus
+            }
+
+            // риски шкалы (11 штук, крайние и средняя — длиннее)
+            Repeater {
+                model: root.showTicks ? 11 : 0
+                delegate: Item {
+                    required property int index
+                    readonly property bool major: index === 0 || index === 5 || index === 10
+                    width: dial.width
+                    height: dial.height
+                    rotation: -135 + index * 27
+                    Rectangle {
+                        width: parent.major ? 1.5 : 1
+                        height: parent.major ? dial.tickLen : dial.tickLen * 0.65
+                        radius: width / 2
+                        x: dial.c - width / 2
+                        y: parent.major ? 0 : dial.tickLen * 0.35
+                        color: Theme.c.knobTick
+                        antialiasing: true
+                    }
+                }
             }
 
             Shape {
@@ -85,20 +133,44 @@ FocusScope {
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     PathAngleArc {
-                        centerX: dial.width / 2; centerY: dial.height / 2
-                        radiusX: dial.r; radiusY: dial.r
+                        centerX: dial.c; centerY: dial.c
+                        radiusX: dial.arcR; radiusY: dial.arcR
                         startAngle: 135; sweepAngle: 270
                     }
                 }
-                // значение
+            }
+
+            // свечение под дугой значения
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+                opacity: root.glowLevel
+                visible: opacity > 0.01 && root.shownPos > 0.002
                 ShapePath {
-                    strokeColor: root.accent
+                    strokeColor: Theme.c.glow
+                    strokeWidth: dial.stroke * 3.4
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    PathAngleArc {
+                        centerX: dial.c; centerY: dial.c
+                        radiusX: dial.arcR; radiusY: dial.arcR
+                        startAngle: 135; sweepAngle: Math.max(0.01, 270 * root.shownPos)
+                    }
+                }
+            }
+
+            // дуга значения
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+                ShapePath {
+                    strokeColor: root.dimmed ? Theme.c.textFaint : root.accent
                     strokeWidth: dial.stroke
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     PathAngleArc {
-                        centerX: dial.width / 2; centerY: dial.height / 2
-                        radiusX: dial.r; radiusY: dial.r
+                        centerX: dial.c; centerY: dial.c
+                        radiusX: dial.arcR; radiusY: dial.arcR
                         startAngle: 135; sweepAngle: Math.max(0.01, 270 * root.shownPos)
                     }
                 }
@@ -107,34 +179,68 @@ FocusScope {
             // метка значения по умолчанию
             Rectangle {
                 readonly property real a: (135 + 270 * (root.param ? root.param.defaultPosition : 0)) * Math.PI / 180
-                width: 3; height: 3; radius: 1.5
+                readonly property real r: dial.arcR - dial.stroke * 1.6
+                width: 2; height: 2; radius: 1
                 color: Theme.c.textFaint
-                x: dial.width / 2 + (dial.r + dial.stroke) * Math.cos(a) - width / 2
-                y: dial.height / 2 + (dial.r + dial.stroke) * Math.sin(a) - height / 2
+                opacity: 0.8
+                x: dial.c + r * Math.cos(a) - width / 2
+                y: dial.c + r * Math.sin(a) - height / 2
             }
 
-            // лицевая часть
+            // тень лицевой части
             Rectangle {
-                id: face
-                anchors.centerIn: parent
-                width: parent.width * 0.64
+                width: dial.faceD + 2
                 height: width
                 radius: width / 2
-                color: dragArea.containsMouse || dragArea.pressed ? Theme.c.surface3 : Theme.c.knobFace
-                border.width: 1
-                border.color: Theme.c.border
-                Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+                x: dial.c - width / 2
+                y: dial.c - width / 2 + dial.faceD * 0.045
+                color: Theme.c.shadow
+                opacity: 0.6
+            }
 
+            // лицевая часть: фаска + градиент
+            Rectangle {
+                id: bevel
+                width: dial.faceD
+                height: width
+                radius: width / 2
+                x: dial.c - width / 2
+                y: dial.c - height / 2
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Theme.c.knobBevel }
+                    GradientStop { position: 1.0; color: Theme.c.knobRim }
+                }
+                Rectangle {
+                    id: face
+                    anchors.fill: parent
+                    anchors.margins: Math.max(1, dial.faceD * 0.035)
+                    radius: width / 2
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: Theme.c.knobFaceTop }
+                        GradientStop { position: 1.0; color: Theme.c.knobFaceBottom }
+                    }
+                    // подсветка при наведении
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: Theme.c.highlight
+                        opacity: dragArea.containsMouse || dragArea.pressed ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+                    }
+                }
+                // указатель
                 Item {
                     anchors.fill: parent
                     rotation: -135 + 270 * root.shownPos
                     Rectangle {
-                        width: Math.max(2, face.width * 0.07)
-                        height: face.height * 0.3
+                        width: Math.max(2, dial.faceD * 0.055)
+                        height: dial.faceD * 0.3
                         radius: width / 2
-                        color: Theme.c.knobPointer
                         anchors.horizontalCenter: parent.horizontalCenter
-                        y: face.height * 0.08
+                        y: dial.faceD * 0.09
+                        color: root.dragging ? root.accent : Theme.c.knobPointer
+                        opacity: root.dimmed ? 0.5 : 1
+                        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
                     }
                 }
             }
@@ -142,25 +248,23 @@ FocusScope {
             // замок рандомайзера
             Rectangle {
                 visible: root.param && root.param.locked
-                width: Theme.size.icon; height: width; radius: width / 2
-                color: Theme.c.surface2
-                border.color: Theme.c.border
+                width: Theme.size.icon * 0.95; height: width; radius: width / 2
+                color: Theme.c.surface3
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.rightMargin: -Theme.space.xs
-                Icon { anchors.centerIn: parent; name: "lock"; size: parent.width * 0.62; color: Theme.c.textMuted }
+                Icon { anchors.centerIn: parent; name: "lock"; size: parent.width * 0.62; color: Theme.c.textMuted; strokeWidth: 2.2 }
             }
 
             // LFO
             Rectangle {
                 visible: root.param && root.param.automated
-                width: Theme.size.icon; height: width; radius: width / 2
-                color: Theme.c.surface2
+                width: Theme.size.icon * 0.95; height: width; radius: width / 2
+                color: Theme.c.surface3
+                border.width: 1
                 border.color: root.accent
                 anchors.left: parent.left
                 anchors.top: parent.top
-                anchors.leftMargin: -Theme.space.xs
-                Icon { anchors.centerIn: parent; name: "wave"; size: parent.width * 0.62; color: root.accent }
+                Icon { anchors.centerIn: parent; name: "wave"; size: parent.width * 0.62; color: root.accent; strokeWidth: 2.2 }
             }
 
             MouseArea {
@@ -177,6 +281,7 @@ FocusScope {
                 property real wheelAccum: 0
 
                 onPressed: (mouse) => {
+                    root.mouseFocus = true
                     root.forceActiveFocus()
                     if (mouse.button === Qt.RightButton) {
                         root.contextRequested(root.param, mouse.x, mouse.y)
@@ -199,8 +304,9 @@ FocusScope {
                 }
                 onReleased: (mouse) => {
                     if (mouse.button === Qt.LeftButton && root.param) root.param.endGesture()
+                    dragMoved = false
                 }
-                onCanceled: if (root.param) root.param.endGesture()
+                onCanceled: { if (root.param) root.param.endGesture(); dragMoved = false }
                 onDoubleClicked: (mouse) => {
                     if (mouse.button === Qt.LeftButton && root.param) root.param.reset()
                 }
@@ -226,8 +332,23 @@ FocusScope {
         // значение / ввод
         Item {
             width: Math.max(root.diameter, valueLabel.implicitWidth)
-            height: valueLabel.implicitHeight + Theme.space.xs
+            height: valueLabel.implicitHeight + Theme.space.xxs
             anchors.horizontalCenter: parent.horizontalCenter
+
+            // поле значения проявляется при наведении — подсказка «можно ввести число»
+            Rectangle {
+                anchors.centerIn: valueLabel
+                width: valueLabel.implicitWidth + Theme.space.md
+                height: valueLabel.implicitHeight + Theme.space.xxs * 2
+                radius: Theme.radius.sm
+                color: Theme.c.surface2
+                border.width: 1
+                border.color: Theme.c.border
+                visible: !editor.visible
+                opacity: valueHover.hovered ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+            }
+            HoverHandler { id: valueHover }
 
             Label {
                 id: valueLabel
@@ -237,7 +358,7 @@ FocusScope {
                 font.pixelSize: Theme.fontSize.sm
                 font.weight: Theme.weight.medium
                 font.features: { "tnum": 1 }
-                color: root.dragging ? root.accent : Theme.c.text
+                color: root.dragging ? root.accent : root.dimmed ? Theme.c.textFaint : Theme.c.text
                 Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
                 MouseArea {
                     anchors.fill: parent
@@ -254,7 +375,9 @@ FocusScope {
                 width: Math.max(root.diameter, implicitWidth)
                 horizontalAlignment: TextInput.AlignHCenter
                 font.pixelSize: Theme.fontSize.sm
+                font.features: { "tnum": 1 }
                 color: Theme.c.text
+                selectionColor: Theme.c.selection
                 selectByMouse: true
                 padding: Theme.space.xxs
                 background: Rectangle {

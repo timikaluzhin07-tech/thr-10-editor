@@ -48,13 +48,27 @@ ComboBox {
 
     background: Rectangle {
         radius: Theme.radius.md
-        color: root.down ? Theme.c.surface3 : Theme.c.surface2
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: root.down ? Theme.c.surface2 : Theme.c.surface3 }
+            GradientStop { position: 1.0; color: Theme.c.surface2 }
+        }
         border.width: 1
-        border.color: root.visualFocus || root.popup.visible ? Theme.c.accent : root.hovered ? Theme.c.borderStrong : Theme.c.border
+        border.color: root.visualFocus || root.popup.visible ? Qt.rgba(Theme.c.accent.r, Theme.c.accent.g, Theme.c.accent.b, 0.7)
+                    : root.hovered ? Theme.c.borderStrong : Theme.c.border
+        Behavior on border.color { ColorAnimation { duration: Theme.motion.fast } }
+        Rectangle {
+            x: parent.radius; y: 1; width: parent.width - parent.radius * 2; height: 1
+            color: Theme.c.highlight
+        }
     }
 
     popup: Popup {
         y: root.height + Theme.space.xs
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.motion.fast }
+            NumberAnimation { property: "scale"; from: 0.98; to: 1; duration: Theme.motion.normal; easing.type: Easing.OutCubic }
+        }
+        exit: Transition { NumberAnimation { property: "opacity"; to: 0; duration: Theme.motion.fast } }
         width: root.width
         implicitHeight: Math.min(contentItem.implicitHeight + Theme.space.sm, Theme.size.control * 9)
         padding: Theme.space.xs
@@ -66,8 +80,8 @@ ComboBox {
             ScrollIndicator.vertical: ScrollIndicator {}
         }
         background: Rectangle {
-            radius: Theme.radius.md
-            color: Theme.c.surface
+            radius: Theme.radius.lg
+            color: Theme.c.surface3
             border.width: 1
             border.color: Theme.c.borderStrong
         }

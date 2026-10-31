@@ -3,49 +3,56 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import THR10
 
-// Карточка блока эффектов: метка цвета, заголовок, переключатель, тип, ручки.
+// Карточка блока эффектов: кнопка питания с «LED», заголовок, тип, ручки сеткой.
+// Выключенный блок не прячется: ручки гаснут (серые дуги), но остаются доступны.
 Card {
     id: root
     property QtObject group: null
     property real knobSize: Theme.size.knobSmall
     property Component headerComponent: null
-    readonly property color accent: group ? Theme.c[group.accent] : Theme.c.accent
+    readonly property color groupColor: group ? Theme.c[group.accent] : Theme.c.accent
+    readonly property bool active: !group || !group.hasSwitch || group.enabled
 
     signal knobContext(QtObject param, Item knob, real x, real y)
 
     spacing: Theme.space.md
 
+    // цветная риска блока у левого края
+    Rectangle {
+        parent: root
+        x: 0
+        y: root.padding + Theme.space.xs
+        width: 2
+        height: Theme.size.control * 0.8
+        radius: 1
+        color: root.groupColor
+        opacity: root.active ? 0.9 : 0.3
+        Behavior on opacity { NumberAnimation { duration: Theme.motion.normal } }
+    }
+
     RowLayout {
         Layout.fillWidth: true
         spacing: Theme.space.sm
 
-        Rectangle {
-            width: Theme.space.sm; height: width; radius: width / 2
-            color: root.accent
-            opacity: root.group && root.group.enabled ? 1 : 0.35
-            Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+        PowerButton {
+            visible: root.group && root.group.hasSwitch
+            checked: root.group ? root.group.enabled : false
+            onToggled: root.group.setEnabled(checked)
         }
         Label {
-            text: root.group ? root.group.title : ""
-            font.pixelSize: Theme.fontSize.lg
-            font.weight: Theme.weight.semibold
-            color: Theme.c.text
+            text: root.group ? root.group.title.toUpperCase() : ""
+            font.pixelSize: Theme.fontSize.sm
+            font.weight: Theme.weight.bold
+            font.letterSpacing: Theme.letterSpacing.caps
+            color: root.active ? Theme.c.text : Theme.c.textMuted
             Layout.fillWidth: true
             elide: Text.ElideRight
+            Behavior on color { ColorAnimation { duration: Theme.motion.normal } }
         }
         Loader {
             active: root.headerComponent !== null
             sourceComponent: root.headerComponent
             Layout.alignment: Qt.AlignVCenter
-        }
-        ToggleSwitch {
-            visible: root.group && root.group.hasSwitch
-            accent: root.accent
-            checked: root.group ? root.group.enabled : false
-            onToggled: root.group.setEnabled(checked)
-            ToolTip.visible: hovered
-            ToolTip.delay: 600
-            ToolTip.text: checked ? "Выключить блок" : "Включить блок"
         }
     }
 
@@ -53,27 +60,37 @@ Card {
         visible: root.group && root.group.typeOptions.length > 0
         Layout.fillWidth: true
         small: true
-        accent: root.accent
         model: root.group ? root.group.typeOptions : []
         currentIndex: root.group ? root.group.typeIndex : 0
         onActivated: (i) => root.group.setType(i)
     }
 
-    Flow {
+    // ручки ровной сеткой
+    GridLayout {
         id: knobs
         Layout.fillWidth: true
-        spacing: Theme.space.md
-        opacity: root.group && root.group.hasSwitch && !root.group.enabled ? 0.55 : 1
-        Behavior on opacity { NumberAnimation { duration: Theme.motion.normal } }
+        Layout.topMargin: Theme.space.xs
+        readonly property int cell: root.knobSize + Theme.space.lg
+        columns: Math.max(1, Math.min(root.group ? root.group.knobKeys.length : 1,
+                                      Math.floor((width + Theme.space.sm) / cell)))
+        columnSpacing: Theme.space.sm
+        rowSpacing: Theme.space.md
 
         Repeater {
             model: root.group ? root.group.knobKeys : []
-            delegate: Knob {
+            delegate: Item {
                 required property string modelData
-                param: Backend.param(modelData)
-                accent: root.accent
-                diameter: root.knobSize
-                onContextRequested: (p, x, y) => root.knobContext(p, this, x, y)
+                Layout.fillWidth: true
+                implicitHeight: knob.implicitHeight
+                implicitWidth: knob.implicitWidth
+                Knob {
+                    id: knob
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    param: Backend.param(modelData)
+                    diameter: root.knobSize
+                    dimmed: !root.active
+                    onContextRequested: (p, x, y) => root.knobContext(p, this, x, y)
+                }
             }
         }
     }
@@ -85,7 +102,6 @@ Card {
             readonly property QtObject p: Backend.param(modelData)
             Layout.fillWidth: true
             spacing: Theme.space.sm
-            opacity: knobs.opacity
             Label {
                 text: p.label.toUpperCase()
                 font.pixelSize: Theme.fontSize.xs
@@ -97,7 +113,7 @@ Card {
             Segmented {
                 Layout.fillWidth: true
                 small: true
-                accent: root.accent
+                accented: false
                 model: p.options
                 currentIndex: p.value
                 onActivated: (i) => { p.beginGesture(); p.setValue(i); p.endGesture() }

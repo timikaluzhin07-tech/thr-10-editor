@@ -10,24 +10,24 @@ AbstractButton {
     signal removeClicked()
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
-    implicitHeight: Theme.size.control * 0.75
-    implicitWidth: row.implicitWidth + Theme.space.md * 2
+    implicitHeight: Theme.size.control * 0.72
+    implicitWidth: row.implicitWidth + Theme.space.sm * 2
     font.pixelSize: Theme.fontSize.sm
 
     background: Rectangle {
-        radius: Theme.radius.pill
+        radius: Theme.radius.sm
         color: root.checked ? Theme.c.accentSoft : root.hovered ? Theme.c.surface3 : Theme.c.surface2
         border.width: 1
-        border.color: root.checked ? root.accent : Theme.c.border
+        border.color: root.checked ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.5) : Theme.c.border
         Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
         Rectangle {
             anchors.fill: parent
             anchors.margins: -Theme.size.focusRing * 2
-            radius: Theme.radius.pill
+            radius: Theme.radius.sm + Theme.size.focusRing * 2
             color: "transparent"
             border.width: Theme.size.focusRing
             border.color: Theme.c.focus
-            opacity: 0.6
+            opacity: 0.55
             visible: root.visualFocus
         }
     }

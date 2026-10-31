@@ -3,14 +3,18 @@ import QtQuick.Controls.Basic
 import THR10
 
 // Всплывающие сообщения внизу окна. kind: info | success | warning | error.
+// Появляются снизу с лёгким подъёмом, исчезают затуханием.
 Item {
     id: root
     width: parent ? parent.width : 0
     height: column.implicitHeight
 
     function show(kind, text) {
-        model.append({ kind: kind, text: text, uid: Date.now() + Math.random() })
-        if (model.count > 4)
+        // одинаковое сообщение подряд не дублируем
+        if (model.count > 0 && model.get(model.count - 1).text === text)
+            return
+        model.append({ kind: kind, text: text })
+        if (model.count > 3)
             model.remove(0)
     }
 
@@ -21,6 +25,8 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         spacing: Theme.space.sm
+
+        move: Transition { NumberAnimation { properties: "y"; duration: Theme.motion.normal; easing.type: Easing.OutCubic } }
 
         Repeater {
             model: model
@@ -36,19 +42,27 @@ Item {
                 width: Math.min(root.width - Theme.space.xl * 2, msg.implicitWidth + Theme.space.lg * 2 + Theme.size.icon + Theme.space.sm)
                 height: Math.max(Theme.size.controlLarge, msg.implicitHeight + Theme.space.md * 2)
                 anchors.horizontalCenter: parent.horizontalCenter
-                radius: Theme.radius.md
+                radius: Theme.radius.lg
                 color: Theme.c.surface3
                 border.width: 1
                 border.color: Theme.c.borderStrong
                 opacity: 0
+                transform: Translate { id: lift; y: 12 }
                 Component.onCompleted: appear.start()
-                NumberAnimation { id: appear; target: toast; property: "opacity"; from: 0; to: 1; duration: Theme.motion.normal }
+                ParallelAnimation {
+                    id: appear
+                    NumberAnimation { target: toast; property: "opacity"; to: 1; duration: Theme.motion.normal; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: lift; property: "y"; to: 0; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
+                }
+                SequentialAnimation {
+                    id: vanish
+                    NumberAnimation { target: toast; property: "opacity"; to: 0; duration: Theme.motion.normal }
+                    ScriptAction { script: if (toast.index >= 0 && toast.index < model.count) model.remove(toast.index) }
+                }
 
-                Rectangle {
-                    width: 3; radius: 1.5
-                    anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                    anchors.margins: Theme.space.sm
-                    color: toast.tone
+                Rectangle {  // блик
+                    x: parent.radius; y: 1; width: parent.width - parent.radius * 2; height: 1
+                    color: Theme.c.highlight
                 }
                 Row {
                     anchors.fill: parent
@@ -70,11 +84,11 @@ Item {
                         font.pixelSize: Theme.fontSize.md
                     }
                 }
-                MouseArea { anchors.fill: parent; onClicked: model.remove(toast.index) }
+                MouseArea { anchors.fill: parent; onClicked: vanish.start() }
                 Timer {
                     running: true
-                    interval: toast.kind === "error" ? 7000 : toast.kind === "warning" ? 5000 : 3200
-                    onTriggered: if (toast.index >= 0 && toast.index < model.count) model.remove(toast.index)
+                    interval: toast.kind === "error" ? 7000 : toast.kind === "warning" ? 5000 : 3000
+                    onTriggered: vanish.start()
                 }
             }
         }

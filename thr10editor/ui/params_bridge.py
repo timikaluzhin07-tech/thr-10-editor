@@ -17,6 +17,7 @@ class ParamItem(QObject):
     changed = Signal()
     activeChanged = Signal()
     flagsChanged = Signal()
+    flash = Signal()  # значение пришло с комбика — короткая подсветка ручки
 
     def __init__(self, backend: "Backend", pdef: ParamDef):
         super().__init__(backend)

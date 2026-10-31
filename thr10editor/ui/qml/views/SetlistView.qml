@@ -36,7 +36,7 @@ ColumnLayout {
     AppButton {
         Layout.fillWidth: true
         variant: "primary"
-        text: "Сцена"
+        text: "Режим «Сцена»"
         iconName: "stage"
         enabled: Backend.setlistItems.length > 0
         tip: "Полноэкранный режим для выступления (F5). ← → / Пробел / PgUp PgDn / педаль"
@@ -67,6 +67,7 @@ ColumnLayout {
             height: Theme.size.controlLarge + Theme.space.xs
             radius: Theme.radius.md
             color: ma.containsMouse ? Theme.c.surface2 : "transparent"
+            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
             MouseArea {
                 id: ma
                 anchors.fill: parent
@@ -79,9 +80,9 @@ ColumnLayout {
                 anchors.leftMargin: Theme.space.sm
                 spacing: Theme.space.sm
                 Label {
-                    text: item.modelData.index + 1
-                    color: Theme.c.groupAmp
-                    font.weight: Theme.weight.bold
+                    text: String(item.modelData.index + 1).padStart(2, "0")
+                    color: Theme.c.textFaint
+                    font.weight: Theme.weight.semibold
                     font.features: { "tnum": 1 }
                     Layout.preferredWidth: Theme.space.xl
                 }

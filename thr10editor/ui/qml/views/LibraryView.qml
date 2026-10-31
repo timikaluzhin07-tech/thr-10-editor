@@ -111,9 +111,19 @@ ColumnLayout {
             width: ListView.view.width
             implicitHeight: col.implicitHeight + Theme.space.sm * 2
             radius: Theme.radius.md
-            color: isCurrent ? Theme.c.accentSoft : rowMa.containsMouse ? Theme.c.surface2 : "transparent"
-            border.width: isCurrent ? 1 : 0
-            border.color: Theme.c.accent
+            color: isCurrent ? Theme.c.surface3 : rowMa.containsMouse ? Theme.c.surface2 : "transparent"
+            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+            // акцентная полоса у выбранного
+            Rectangle {
+                width: 2
+                radius: 1
+                height: parent.height - Theme.space.md
+                anchors.verticalCenter: parent.verticalCenter
+                x: 0
+                color: Theme.c.accent
+                opacity: row.isCurrent ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.motion.normal } }
+            }
 
             MouseArea {
                 id: rowMa
@@ -141,7 +151,7 @@ ColumnLayout {
                         text: row.name
                         font.pixelSize: Theme.fontSize.md
                         font.weight: row.isCurrent ? Theme.weight.semibold : Theme.weight.medium
-                        color: row.isCurrent ? Theme.c.accent : Theme.c.text
+                        color: Theme.c.text
                         elide: Text.ElideRight
                     }
                     Label {
@@ -164,7 +174,8 @@ ColumnLayout {
                     boxSize: Theme.size.control * 0.85
                     iconName: "star"
                     iconColor: row.favorite ? Theme.c.accent : Theme.c.textFaint
-                    checked: row.favorite
+                    opacity: row.favorite || rowMa.containsMouse || hovered ? 1 : 0.0
+                    Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
                     tip: row.favorite ? "Убрать из избранного" : "В избранное"
                     onClicked: Backend.toggleFavorite(row.presetId)
                 }
@@ -189,7 +200,6 @@ ColumnLayout {
         spacing: Theme.space.xs
         AppButton {
             Layout.fillWidth: true
-            variant: "primary"
             text: "Сохранить звук"
             iconName: "save"
             tip: "Ctrl+S — обновить пресет / Ctrl+Shift+S — сохранить как новый"

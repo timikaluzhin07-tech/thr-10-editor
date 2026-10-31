@@ -115,6 +115,9 @@ class Backend(QObject):
         values = self.state.values
         for key in changes:
             self._params[key].sync(values[key])
+        if origin is Origin.DEVICE and len(changes) <= 3:
+            for key in changes:
+                self._params[key].flash.emit()
         if any(PARAMS[k].is_type_selector or PARAMS[k].kind.value == "switch" for k in changes):
             self._sync_active(values)
         for g in self._groups.values():

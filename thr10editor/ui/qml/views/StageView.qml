@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic
+import QtQuick.Shapes
 import THR10
 import "../components"
 
@@ -11,6 +12,30 @@ Rectangle {
     visible: opacity > 0
     opacity: Backend.stageActive ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: Theme.motion.slow; easing.type: Easing.OutCubic } }
+
+    // тёплое свечение за именем пресета
+    Shape {
+        anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeWidth: -1
+            strokeColor: "transparent"
+            fillGradient: RadialGradient {
+                centerX: root.width / 2
+                centerY: root.height * 0.45
+                centerRadius: Math.max(root.width, root.height) * 0.55
+                focalX: centerX
+                focalY: centerY
+                GradientStop { position: 0.0; color: Theme.c.bgGlow }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
+            startX: 0; startY: 0
+            PathLine { x: root.width; y: 0 }
+            PathLine { x: root.width; y: root.height }
+            PathLine { x: 0; y: root.height }
+            PathLine { x: 0; y: 0 }
+        }
+    }
 
     // перехват мыши, чтобы клики не уходили в редактор
     MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: (w) => w.accepted = true }
@@ -39,10 +64,11 @@ Rectangle {
         Label {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
-            text: (Backend.stageIndex + 1) + " / " + Backend.stageCount
-            color: Theme.c.groupAmp
-            font.pixelSize: Theme.fontSize.stageSub
-            font.weight: Theme.weight.bold
+            text: String(Backend.stageIndex + 1).padStart(2, "0") + "  /  " + String(Backend.stageCount).padStart(2, "0")
+            color: Theme.c.accent
+            font.pixelSize: Theme.fontSize.stageSub * 0.8
+            font.weight: Theme.weight.semibold
+            font.letterSpacing: Theme.letterSpacing.caps
             font.features: { "tnum": 1 }
         }
         Label {
@@ -86,10 +112,13 @@ Rectangle {
                 signal activated()
                 Layout.fillWidth: true
                 Layout.preferredHeight: Theme.size.controlLarge * 2.6
-                radius: Theme.radius.xl
-                color: navMa.pressed ? Theme.c.surface3 : navMa.containsMouse ? Theme.c.surface2 : Theme.c.surface
+                radius: Theme.radius.lg
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: navMa.containsMouse ? Theme.c.surface3 : Theme.c.surfaceTop }
+                    GradientStop { position: 1.0; color: navMa.pressed ? Theme.c.surface3 : Theme.c.surface }
+                }
                 border.width: 1
-                border.color: Theme.c.border
+                border.color: navMa.containsMouse ? Theme.c.borderStrong : Theme.c.border
                 opacity: name ? 1 : 0.35
                 MouseArea { id: navMa; anchors.fill: parent; hoverEnabled: true; onClicked: nc.activated() }
                 RowLayout {

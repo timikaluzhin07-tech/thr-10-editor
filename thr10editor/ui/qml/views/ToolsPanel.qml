@@ -15,21 +15,23 @@ Rectangle {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.space.md
+        anchors.topMargin: Theme.space.sm
         anchors.leftMargin: Theme.space.md + 1
         spacing: Theme.space.md
 
-        Segmented {
+        TabStrip {
             id: tabs
             Layout.fillWidth: true
-            small: true
             model: ["Рандом", "Морфинг", "LFO", "Тап"]
-            onActivated: (i) => currentIndex = i
+            onCurrentIndexChanged: switchAnim.restart()
         }
 
         StackLayout {
+            id: stack
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: tabs.currentIndex
+            transform: Translate { id: stackShift }
 
             // ---------------- Рандомайзер ----------------
             ColumnLayout {
@@ -117,7 +119,7 @@ Rectangle {
                             text: rp.modelData.label
                             color: rp.modelData.locked ? Theme.c.textFaint : Theme.c.text
                             font.pixelSize: Theme.fontSize.xs
-                            Layout.preferredWidth: Theme.space.xxxl * 1.4
+                            Layout.preferredWidth: Theme.space.xxxl * 2.35
                             elide: Text.ElideRight
                         }
                         AppRangeSlider {
@@ -166,7 +168,7 @@ Rectangle {
                 Segmented {
                     Layout.fillWidth: true
                     small: true
-                    model: ["Линейная", "Плавная", "Ускорение", "Замедление"]
+                    model: ["Линейно", "Плавно", "Разгон", "Торможение"]
                     currentIndex: Backend.morphCurves.indexOf(Backend.morphCurve)
                     onActivated: (i) => Backend.morphCurve = Backend.morphCurves[i]
                 }
@@ -331,15 +333,26 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Theme.size.knobLarge * 1.6
                     radius: Theme.radius.xl
-                    color: tapMa.pressed ? Theme.c.accentSoft : tapMa.containsMouse ? Theme.c.surface3 : Theme.c.surface2
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: tapMa.containsMouse ? Theme.c.surface3 : Theme.c.surface2 }
+                        GradientStop { position: 1.0; color: Theme.c.surface2 }
+                    }
                     border.width: 1
                     border.color: tapMa.pressed ? Theme.c.accent : Theme.c.border
-                    Behavior on color { ColorAnimation { duration: 80 } }
+                    // вспышка на каждый удар
+                    Rectangle {
+                        id: tapFlash
+                        anchors.fill: parent
+                        radius: parent.radius
+                        color: Theme.c.glow
+                        opacity: 0
+                        NumberAnimation on opacity { id: tapPulse; running: false; from: 0.9; to: 0; duration: Theme.motion.flash; easing.type: Easing.OutQuad }
+                    }
                     MouseArea {
                         id: tapMa
                         anchors.fill: parent
                         hoverEnabled: true
-                        onPressed: Backend.tapTempo()
+                        onPressed: { Backend.tapTempo(); tapPulse.restart() }
                     }
                     ColumnLayout {
                         anchors.centerIn: parent
@@ -378,5 +391,11 @@ Rectangle {
                 Item { Layout.fillHeight: true }
             }
         }
+    }
+
+    ParallelAnimation {
+        id: switchAnim
+        NumberAnimation { target: stack; property: "opacity"; from: 0; to: 1; duration: Theme.motion.normal; easing.type: Easing.OutCubic }
+        NumberAnimation { target: stackShift; property: "x"; from: 6; to: 0; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
     }
 }

@@ -12,7 +12,7 @@ Slider {
         x: root.leftPadding
         y: root.topPadding + root.availableHeight / 2 - height / 2
         width: root.availableWidth
-        height: Theme.space.xs
+        height: 3
         radius: height / 2
         color: Theme.c.knobTrack
         Rectangle {
@@ -25,10 +25,15 @@ Slider {
     handle: Rectangle {
         x: root.leftPadding + root.visualPosition * (root.availableWidth - width)
         y: root.topPadding + root.availableHeight / 2 - height / 2
-        width: Theme.space.lg; height: width; radius: width / 2
-        color: root.pressed ? root.accent : Theme.c.knobFace
-        border.width: 2
-        border.color: root.accent
-        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+        width: Theme.space.md * 1.15; height: width; radius: width / 2
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Theme.c.knobFaceTop }
+            GradientStop { position: 1.0; color: Theme.c.knobFaceBottom }
+        }
+        border.width: 1
+        border.color: root.pressed || root.hovered ? root.accent : Theme.c.textFaint
+        scale: root.pressed ? 1.12 : 1
+        Behavior on scale { NumberAnimation { duration: Theme.motion.fast } }
+        Behavior on border.color { ColorAnimation { duration: Theme.motion.fast } }
     }
 }

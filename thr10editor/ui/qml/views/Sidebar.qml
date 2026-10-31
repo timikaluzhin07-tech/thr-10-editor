@@ -5,6 +5,7 @@ import THR10
 import "../components"
 
 // Боковая панель с вкладками. Вкладки задаются списком {title, component}.
+// При смене вкладки содержимое мягко проявляется.
 Rectangle {
     id: root
     property var tabs: []
@@ -16,22 +17,24 @@ Rectangle {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.space.md
+        anchors.topMargin: Theme.space.sm
         anchors.rightMargin: Theme.space.md + 1
         spacing: Theme.space.md
 
-        Segmented {
+        TabStrip {
             id: tabs_
             Layout.fillWidth: true
-            small: true
             visible: root.tabs.length > 1
             model: root.tabs.map(t => t.title)
-            onActivated: (i) => currentIndex = i
+            onCurrentIndexChanged: switchAnim.restart()
         }
 
         StackLayout {
+            id: stack
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: tabs_.currentIndex
+            transform: Translate { id: stackShift }
             Repeater {
                 model: root.tabs
                 delegate: Loader {
@@ -40,5 +43,11 @@ Rectangle {
                 }
             }
         }
+    }
+
+    ParallelAnimation {
+        id: switchAnim
+        NumberAnimation { target: stack; property: "opacity"; from: 0; to: 1; duration: Theme.motion.normal; easing.type: Easing.OutCubic }
+        NumberAnimation { target: stackShift; property: "x"; from: -6; to: 0; duration: Theme.motion.slow; easing.type: Easing.OutCubic }
     }
 }

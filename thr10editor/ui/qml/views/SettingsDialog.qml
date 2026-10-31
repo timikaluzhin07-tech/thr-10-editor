@@ -32,10 +32,20 @@ AppDialog {
             onActivated: (i) => Theme.setMode(i === 0 ? "dark" : "light")
         }
     }
-    Row2 {
-        label: "Масштаб интерфейса"
-        hint: "Ctrl + / Ctrl − / Ctrl 0. Плюс автоматическая подстройка под размер окна."
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: Theme.space.xs
+        Label { text: "Масштаб интерфейса"; color: Theme.c.text; font.pixelSize: Theme.fontSize.md }
+        Label {
+            Layout.fillWidth: true
+            text: "Ctrl + / Ctrl − / Ctrl 0. Плюс автоматическая подстройка под размер окна."
+            color: Theme.c.textMuted
+            font.pixelSize: Theme.fontSize.sm
+            wrapMode: Text.Wrap
+        }
         Segmented {
+            Layout.fillWidth: true
+            Layout.topMargin: Theme.space.xs
             model: ["80%", "90%", "100%", "110%", "125%", "140%", "160%"]
             readonly property var zooms: [0.8, 0.9, 1.0, 1.1, 1.25, 1.4, 1.6]
             currentIndex: Math.max(0, zooms.indexOf(Theme.zoom))
@@ -63,7 +73,7 @@ AppDialog {
     Row2 {
         label: "Интервал отправки, мс"
         hint: "Не чаще одного сообщения за этот интервал. Применяется после перезапуска."
-        SpinBox {
+        AppSpinBox {
             from: 5; to: 200; stepSize: 5
             value: Backend.getSetting("send_interval_ms")
             onValueModified: Backend.setSetting("send_interval_ms", value)

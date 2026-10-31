@@ -26,7 +26,7 @@ AbstractButton {
         radius: Theme.radius.md
         color: root.checked ? Theme.c.accentSoft : root.down ? Theme.c.surface3 : root.hovered ? Theme.c.surface2 : "transparent"
         border.width: root.checked ? 1 : 0
-        border.color: Theme.c.accent
+        border.color: Qt.rgba(Theme.c.accent.r, Theme.c.accent.g, Theme.c.accent.b, 0.45)
         Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
         Rectangle {
             anchors.fill: parent
@@ -35,7 +35,7 @@ AbstractButton {
             color: "transparent"
             border.width: Theme.size.focusRing
             border.color: Theme.c.focus
-            opacity: 0.6
+            opacity: 0.55
             visible: root.visualFocus
         }
     }
@@ -45,6 +45,8 @@ AbstractButton {
             name: root.iconName
             size: Theme.size.icon
             color: !root.enabled ? Theme.c.textFaint : root.checked ? Theme.c.accent : root.hovered ? Theme.c.text : root.iconColor
+            opacity: root.enabled ? 1 : 0.6
+            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
         }
     }
 }

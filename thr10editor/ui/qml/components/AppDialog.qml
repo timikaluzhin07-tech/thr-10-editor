@@ -32,9 +32,16 @@ Popup {
 
     background: Rectangle {
         radius: Theme.radius.xl
-        color: Theme.c.surface
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Theme.c.surfaceTop }
+            GradientStop { position: 0.3; color: Theme.c.surface }
+        }
         border.width: 1
         border.color: Theme.c.borderStrong
+        Rectangle {
+            x: parent.radius; y: 1; width: parent.width - parent.radius * 2; height: 1
+            color: Theme.c.highlight
+        }
     }
 
     contentItem: ColumnLayout {
@@ -45,6 +52,7 @@ Popup {
                 text: root.title
                 font.pixelSize: Theme.fontSize.xl
                 font.weight: Theme.weight.semibold
+                font.letterSpacing: Theme.letterSpacing.tight * 0.5
                 color: Theme.c.text
                 Layout.fillWidth: true
                 elide: Text.ElideRight

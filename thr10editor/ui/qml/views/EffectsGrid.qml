@@ -45,6 +45,7 @@ Item {
             Behavior on x { NumberAnimation { duration: Theme.motion.normal; easing.type: Easing.OutCubic } }
             Behavior on y { NumberAnimation { duration: Theme.motion.normal; easing.type: Easing.OutCubic } }
             headerComponent: root.extras[modelData] || null
+            appearIndex: index + 1
             onKnobContext: (p, k, x, y) => root.knobContext(p, k, x, y)
         }
     }

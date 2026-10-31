@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import QtQuick.Dialogs
 import QtQuick.Window
+import QtQuick.Shapes
 import THR10
 import "components"
 import "views"
@@ -169,6 +170,30 @@ ApplicationWindow {
     }
     Component { id: setlistComp; SetlistView { onStageRequested: (i) => win.startStage(i) } }
 
+    // едва заметное тёплое свечение сверху — глубина без «эффектов ради эффектов»
+    Shape {
+        anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            strokeWidth: -1
+            strokeColor: "transparent"
+            fillGradient: RadialGradient {
+                centerX: win.width * 0.5
+                centerY: -win.height * 0.25
+                centerRadius: Math.max(win.width, win.height) * 0.85
+                focalX: centerX
+                focalY: centerY
+                GradientStop { position: 0.0; color: Theme.c.bgGlow }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
+            startX: 0; startY: 0
+            PathLine { x: win.width; y: 0 }
+            PathLine { x: win.width; y: win.height }
+            PathLine { x: 0; y: win.height }
+            PathLine { x: 0; y: 0 }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -199,6 +224,7 @@ ApplicationWindow {
 
                 AmpPanel {
                     Layout.fillWidth: true
+                    appearIndex: 0
                     onKnobContext: (p, k, x, y) => win.showKnobMenu(p, k, x, y)
                 }
                 EffectsGrid {

@@ -38,8 +38,16 @@ Flickable {
                 radius: Theme.radius.md
                 color: capturing ? Theme.c.accentSoft : Theme.c.surface2
                 border.width: 1
-                border.color: capturing ? Theme.c.accent : Theme.c.border
+                border.color: capturing ? Qt.rgba(Theme.c.accent.r, Theme.c.accent.g, Theme.c.accent.b, 0.6) : Theme.c.border
                 Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+                // ожидание нажатия кнопки на комбике — мягкая пульсация рамки
+                SequentialAnimation on opacity {
+                    running: slot.capturing
+                    loops: Animation.Infinite
+                    onRunningChanged: if (!running) slot.opacity = 1
+                    NumberAnimation { to: 0.75; duration: 700; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutSine }
+                }
 
                 ColumnLayout {
                     id: slotCol
@@ -52,13 +60,25 @@ Flickable {
                         spacing: Theme.space.md
                         Rectangle {
                             width: Theme.size.control; height: width; radius: Theme.radius.sm
-                            color: Theme.c.surface3
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: Theme.c.knobFaceTop }
+                                GradientStop { position: 1.0; color: Theme.c.knobFaceBottom }
+                            }
+                            border.width: 1
+                            border.color: Theme.c.knobRim
                             Label {
                                 anchors.centerIn: parent
                                 text: slot.idx + 1
                                 font.pixelSize: Theme.fontSize.lg
-                                font.weight: Theme.weight.bold
-                                color: Theme.c.groupAmp
+                                font.weight: Theme.weight.semibold
+                                color: slot.modelData.known ? Theme.c.text : Theme.c.textFaint
+                            }
+                            // «LED» известной ячейки
+                            Rectangle {
+                                width: 5; height: 5; radius: 2.5
+                                anchors.right: parent.right; anchors.top: parent.top
+                                anchors.margins: 3
+                                color: slot.capturing ? Theme.c.warning : slot.modelData.known ? Theme.c.accent : "transparent"
                             }
                         }
                         ColumnLayout {
