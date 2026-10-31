@@ -22,6 +22,19 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _safe_console() -> None:
+    """Не падать на кириллице, если консоль/конвейер в однобайтной кодировке."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+_safe_console()
 UI = os.path.join(ROOT, "thr10editor", "ui")
 
 # Модули Qt, которые редактору не нужны: без них .exe заметно меньше.

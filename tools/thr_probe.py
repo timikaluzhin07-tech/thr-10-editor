@@ -57,6 +57,19 @@ from thr10editor.transport.base import Transport, TransportError  # noqa: E402
 EXIT_OK, EXIT_PORT, EXIT_NO_RESPONSE, EXIT_MISMATCH = 0, 1, 2, 3
 
 
+def _safe_console() -> None:
+    """Не падать на кириллице, если консоль/конвейер в однобайтной кодировке."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+_safe_console()
+
+
 class Log:
     def __init__(self, stream: TextIO | None, echo: bool = True):
         self.stream = stream

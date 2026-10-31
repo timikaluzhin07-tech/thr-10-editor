@@ -48,6 +48,19 @@ from thr10editor.protocol.sysex import (  # noqa: E402
 )
 
 LINKTYPE_USBPCAP = 249
+
+
+def _safe_console() -> None:
+    """Не падать на кириллице, если консоль/конвейер в однобайтной кодировке."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+_safe_console()
 USBPCAP_HEADER = struct.Struct("<HQIHBHHBBI")  # 27 байт
 
 TO_DEVICE = "ПК → комбик"
