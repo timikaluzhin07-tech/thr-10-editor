@@ -23,7 +23,22 @@ ApplicationWindow {
 
     onWidthChanged: Theme.updateWindowSize(width, height)
     onHeightChanged: Theme.updateWindowSize(width, height)
-    Component.onCompleted: Theme.updateWindowSize(width, height)
+    Component.onCompleted: {
+        const w = Backend.getSetting("window")
+        if (w && w.width >= minimumWidth && w.height >= minimumHeight) {
+            width = Math.min(w.width, Screen.desktopAvailableWidth)
+            height = Math.min(w.height, Screen.desktopAvailableHeight)
+        }
+        if (w && w.maximized)
+            visibility = Window.Maximized
+        Theme.updateWindowSize(width, height)
+    }
+    onClosing: {
+        if (Backend.stageActive)
+            Backend.stopStage()
+        const max = visibility === Window.Maximized || visibility === Window.FullScreen
+        Backend.setSetting("window", { width: max ? 1360 : width, height: max ? 860 : height, maximized: max })
+    }
 
     property bool sidebarVisible: Backend.getSetting("sidebar_visible") !== false
     readonly property bool compact: width < 980

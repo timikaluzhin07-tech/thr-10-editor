@@ -45,11 +45,20 @@ log = logging.getLogger(__name__)
 AB_TARGET = "__ab__"
 
 
+def full_label(key: str) -> str:
+    """Подпись параметра с типом эффекта, если он зависит от типа: «Output (Rack)»."""
+    p = PARAMS[key]
+    if p.depends_on and len(p.depends_values) == 1:
+        return f"{p.label} ({PARAMS[p.depends_on].options[p.depends_values[0]]})"
+    return p.label
+
+
 def _label(changes: Changes) -> str:
     if len(changes) == 1:
-        p = PARAMS[next(iter(changes))]
+        key = next(iter(changes))
+        p = PARAMS[key]
         g = GROUPS_BY_KEY[p.group].title
-        return f"{g}: {p.label}" if p.group != "amp" else p.label
+        return f"{g}: {full_label(key)}" if p.group != "amp" else p.label
     return f"Изменено параметров: {len(changes)}"
 
 
@@ -210,12 +219,6 @@ class FullBackend(Backend):
         self._known_name = new
         self.history.record({}, "Переименование", name=(old, new), merge_key="rename")
         self.historyChanged.emit()
-
-    def begin_gesture(self, key: str) -> None:
-        super().begin_gesture(key)
-
-    def end_gesture(self) -> None:
-        super().end_gesture()
 
     def _apply_step(self, step: Step) -> None:
         self._applying = True
@@ -969,7 +972,7 @@ class FullBackend(Backend):
             lo, hi = self.rand.bounds_for(k)
             g = GROUPS_BY_KEY[p.group].title
             first, prev_group = g != prev_group, g
-            out.append({"key": k, "label": p.label, "group": g, "groupFirst": first,
+            out.append({"key": k, "label": full_label(k), "group": g, "groupFirst": first,
                         "accent": GROUPS_BY_KEY[p.group].accent, "lo": lo, "hi": hi,
                         "locked": k in self.rand.locked})
         return out
@@ -1114,7 +1117,7 @@ class FullBackend(Backend):
         for l in self.automation.lfos:
             p = PARAMS[l.key]
             g = GROUPS_BY_KEY[p.group]
-            out.append({"id": l.id, "key": l.key, "label": p.label, "group": g.title,
+            out.append({"id": l.id, "key": l.key, "label": full_label(l.key), "group": g.title,
                         "accent": g.accent, "waveform": l.waveform,
                         "waveformIndex": WAVEFORMS.index(l.waveform),
                         "rate": l.rate_hz, "depth": l.depth, "enabled": l.enabled,
@@ -1127,7 +1130,7 @@ class FullBackend(Backend):
 
     @Property("QVariantList", constant=True)
     def automatableParams(self) -> list[dict[str, str]]:  # noqa: N802
-        return [{"key": k, "name": f"{GROUPS_BY_KEY[p.group].title}: {p.label}"}
+        return [{"key": k, "name": f"{GROUPS_BY_KEY[p.group].title}: {full_label(k)}"}
                 for k, p in PARAMS.items() if p.kind is Kind.RANGE]
 
     @Slot(str)

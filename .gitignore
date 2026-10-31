@@ -24,3 +24,7 @@ Thumbs.db
 captures/
 *.pcap
 *.pcapng
+
+# Logs
+thr_probe_*.log
+*.log

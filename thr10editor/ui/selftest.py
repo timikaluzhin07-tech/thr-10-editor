@@ -61,6 +61,7 @@ def run_selftest(app: Any, backend: Any, theme: Any, window: Any, seconds: float
                 print("SELFTEST FAIL:", p)
             exit_code["value"] = 1
         else:
+            log.info("selftest: OK")
             print("SELFTEST OK")
         app.quit()
 

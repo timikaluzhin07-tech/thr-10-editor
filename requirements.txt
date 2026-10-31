@@ -3,7 +3,9 @@
 # поэтому для Windows нужен Python 3.11 или 3.12 (см. README).
 
 # --- приложение ---
-PySide6==6.12.0
+# Только базовые модули Qt (QtQuick, Controls, Dialogs, Shapes): без Addons
+# и WebEngine сборка .exe в 2+ раза меньше. Проверено: все тесты и самопроверка.
+PySide6-Essentials==6.12.0
 mido==1.3.3
 python-rtmidi==1.5.8
 
