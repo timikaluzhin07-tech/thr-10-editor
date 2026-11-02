@@ -36,7 +36,7 @@ ICONS = {
     "arrow-down": "arrow-down", "log": "terminal", "music": "list-music",
     "download": "download", "upload": "upload", "fullscreen": "maximize",
     "minimize": "minimize", "library": "library", "cpu": "cpu", "timer": "timer",
-    "dot": "dot", "circle": "circle", "eye": "eye", "pause": "pause", "minus": "minus",
+    "dot": "dot", "circle": "circle", "eye": "eye", "pause": "pause", "minus": "minus", "image": "image",
 }
 
 

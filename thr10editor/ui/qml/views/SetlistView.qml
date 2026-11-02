@@ -100,7 +100,8 @@ ColumnLayout {
                         text: [item.modelData.summary,
                                item.modelData.tuning,
                                item.modelData.chords ? "аккорды" : "",
-                               item.modelData.hasBackground ? "фон" : ""].filter(x => x).join("  ·  ")
+                               item.modelData.hasBackground ? "фон" : "",
+                               item.modelData.hasCover ? "обложка" : ""].filter(x => x).join("  ·  ")
                         color: Theme.c.textMuted
                         font.pixelSize: Theme.fontSize.xs
                         elide: Text.ElideRight
@@ -108,7 +109,7 @@ ColumnLayout {
                 }
                 IconButton {
                     boxSize: Theme.size.control * 0.8
-                    iconName: "edit"; tip: "Строй, аккорды и фон для сцены"
+                    iconName: "edit"; tip: "Строй, аккорды, фон и обложка для сцены"
                     enabled: !item.modelData.missing
                     onClicked: trackDialog.openFor(item.modelData.index)
                 }

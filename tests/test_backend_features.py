@@ -462,3 +462,90 @@ def test_stage_shows_track_data(b, tmp_path):
     assert b.presetName == "Song 3"
     b.deletePreset(b.setlistItems[1]["id"])  # трек с фоном удалён — файл тоже
     assert list((tmp_path / "backgrounds").iterdir()) == []
+
+
+# ---- GIF, обложка трека, картинки в карточках модулей (версия 1.3) -------------
+
+def _gif(tmp_path, name="anim.gif"):
+    from gif_sample import write_gif
+
+    path = tmp_path / "src" / name
+    path.parent.mkdir(exist_ok=True)
+    return write_gif(path, 3)
+
+
+def test_track_background_accepts_gif(b, tmp_path):
+    _setlist_with_tracks(b, 1)
+    src = _gif(tmp_path)
+    assert b.setTrackBackground(0, str(src)) is True
+    item = b.setlistItems[0]
+    assert item["hasBackground"] and item["backgroundGif"] and item["background"].endswith(".gif")
+    files = list((tmp_path / "backgrounds").iterdir())
+    assert len(files) == 1 and files[0].read_bytes() == src.read_bytes()
+    b.startStage(0)
+    assert b.stageBackgroundGif is True and b.stageBackground.endswith(".gif")
+
+
+def test_video_files_are_rejected(b, tmp_path):
+    _setlist_with_tracks(b, 1)
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"\x00\x00\x00\x18ftypmp42")
+    assert b.setTrackMedia(0, "background", str(video)) is False
+    assert b.setModuleMedia("comp", str(video)) is False
+    assert not b.setlistItems[0]["hasBackground"] and b.moduleMedia == {}
+
+
+def test_track_cover_set_replace_clear_independent_of_background(b, tmp_path):
+    _setlist_with_tracks(b, 2)
+    bg_dir = tmp_path / "backgrounds"
+    assert b.setTrackMedia(0, "background", str(_image(tmp_path))) is True
+    assert b.setTrackMedia(0, "cover", str(_gif(tmp_path))) is True
+    item = b.setlistItems[0]
+    assert item["hasCover"] and item["coverGif"] and item["hasBackground"]
+    assert item["cover"] != item["background"] and len(list(bg_dir.iterdir())) == 2
+    # обложка на сцене — отдельно от фона; у второго трека её нет
+    b.startStage(0)
+    assert b.stageCover.endswith(".gif") and b.stageCoverGif and b.stageBackground.endswith(".png")
+    b.stageNext()
+    assert b.stageCover == "" and b.stageCoverGif is False
+    # замена обложки: старый файл удаляется, фон не трогается
+    assert b.setTrackMedia(0, "cover", str(_image(tmp_path, "c.jpg", "JPG"))) is True
+    names = sorted(p.suffix for p in bg_dir.iterdir())
+    assert names == [".jpg", ".png"] and not b.setlistItems[0]["coverGif"]
+    b.clearTrackMedia(0, "cover")
+    assert not b.setlistItems[0]["hasCover"] and b.setlistItems[0]["hasBackground"]
+    assert [p.suffix for p in bg_dir.iterdir()] == [".png"]
+    # неизвестное поле не принимается
+    assert b.setTrackMedia(0, "chords", str(_image(tmp_path))) is False
+
+
+def test_module_media_set_persist_and_clear(b, qapp, tmp_path):
+    from thr10editor.ui.backend_full import FullBackend
+
+    seen = []
+    b.moduleMediaChanged.connect(lambda: seen.append(1))
+    assert b.setModuleMedia("comp", str(_gif(tmp_path))) is True
+    assert b.setModuleMedia("amp", str(_image(tmp_path))) is True
+    assert b.setModuleMedia("nope", str(_image(tmp_path))) is False
+    mm = b.moduleMedia
+    assert set(mm) == {"comp", "amp"} and mm["comp"]["gif"] and not mm["amp"]["gif"]
+    assert mm["comp"]["url"].startswith("file:") and len(seen) == 2
+    bg_dir = tmp_path / "backgrounds"
+    assert len(list(bg_dir.iterdir())) == 2
+    # картинки модулей переживают перезапуск и уборку файлов фонов сет-листа
+    _setlist_with_tracks(b, 1)
+    b.setTrackBackground(0, str(_image(tmp_path, "t.png")))
+    b.clearTrackBackground(0)
+    assert len(list(bg_dir.iterdir())) == 2
+    b.shutdown()
+    b2 = FullBackend(str(tmp_path))
+    try:
+        assert set(b2.moduleMedia) == {"comp", "amp"}
+        # замена — старый файл удалён; удаление — файл удалён
+        assert b2.setModuleMedia("comp", str(_image(tmp_path, "c2.webp", "WEBP"))) is True
+        assert len(list(bg_dir.iterdir())) == 2 and not b2.moduleMedia["comp"]["gif"]
+        b2.clearModuleMedia("comp")
+        b2.clearModuleMedia("amp")
+        assert b2.moduleMedia == {} and list(bg_dir.iterdir()) == []
+    finally:
+        b2.shutdown()

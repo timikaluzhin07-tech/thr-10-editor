@@ -3,7 +3,8 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import THR10
 
-// Карточка блока эффектов: кнопка питания с «LED», заголовок, тип, ручки сеткой.
+// Карточка блока эффектов: кнопка питания с «LED», заголовок, тип, ручки сеткой,
+// необязательная картинка/GIF внизу.
 // Выключенный блок не прячется: ручки гаснут (серые дуги), но остаются доступны.
 Card {
     id: root
@@ -48,6 +49,14 @@ Card {
             Layout.fillWidth: true
             elide: Text.ElideRight
             Behavior on color { ColorAnimation { duration: Theme.motion.normal } }
+        }
+        IconButton {
+            objectName: "moduleMediaButton"
+            iconName: "image"
+            boxSize: Theme.size.control * 0.85
+            iconColor: mediaBox.has ? Theme.c.textMuted : Theme.c.textFaint
+            tip: mediaBox.has ? "Заменить картинку блока" : "Добавить фото или GIF в блок (или перетащите файл на карточку)"
+            onClicked: mediaBox.pick()
         }
         Loader {
             active: root.headerComponent !== null
@@ -119,5 +128,20 @@ Card {
                 onActivated: (i) => { p.beginGesture(); p.setValue(i); p.endGesture() }
             }
         }
+    }
+
+    // фото или GIF блока (растягивается по ширине карточки без обрезки)
+    ModuleMedia {
+        id: mediaBox
+        Layout.fillWidth: true
+        Layout.topMargin: Theme.space.xs
+        groupKey: root.group ? root.group.key : ""
+        title: root.group ? root.group.title : ""
+    }
+
+    MediaDropArea {
+        parent: root
+        anchors.fill: parent
+        media: mediaBox
     }
 }

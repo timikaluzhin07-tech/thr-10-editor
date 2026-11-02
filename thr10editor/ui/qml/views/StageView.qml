@@ -5,7 +5,7 @@ import QtQuick.Shapes
 import THR10
 import "../components"
 
-// Режим «Сцена»: крупно текущий пресет, строй и аккорды, соседние треки.
+// Режим «Сцена»: крупно текущий пресет, обложка, строй и аккорды, соседние треки.
 // Клавиши обрабатываются на уровне всего режима (FocusScope), а не кнопками:
 //   Пробел, →, ↓, PgDn — следующий трек;  ←, ↑, PgUp, Backspace — предыдущий;
 //   Esc — выход. Кнопки режима не принимают фокус, поэтому пробел их не «нажимает».
@@ -44,15 +44,15 @@ FocusScope {
 
     Rectangle { anchors.fill: parent; color: Theme.c.bg }
 
-    // фон трека: заполняет экран с сохранением пропорций (лишнее обрезается)
-    Image {
+    // фон трека (картинка или GIF): растягивается на весь экран без обрезки
+    MediaImage {
         id: bg
+        objectName: "stageBackground"
         anchors.fill: parent
         source: Backend.stageBackground
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: false
-        visible: root.onImage && status === Image.Ready
+        gif: Backend.stageBackgroundGif
+        fillMode: Image.Stretch
+        visible: root.onImage && ready
         opacity: visible ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.motion.slow } }
     }
@@ -135,6 +135,37 @@ FocusScope {
             font.weight: Theme.weight.semibold
             font.letterSpacing: Theme.letterSpacing.caps
             font.features: { "tnum": 1 }
+        }
+        // обложка трека: по центру поверх фона, в своих пропорциях
+        Item {
+            id: coverBox
+            visible: Backend.stageCover !== ""
+            Layout.fillWidth: true
+            Layout.preferredHeight: root.height * (Backend.stageChords !== "" ? 0.2 : 0.3)
+            Layout.minimumHeight: Theme.size.control * 2
+            Layout.topMargin: Theme.space.sm
+            Layout.bottomMargin: Theme.space.sm
+            Rectangle {
+                id: coverFrame
+                anchors.centerIn: parent
+                height: Math.min(parent.height, parent.width / cover.aspect)
+                width: height * cover.aspect
+                radius: Theme.radius.lg
+                color: "#33000000"
+                border.width: 1
+                border.color: root.onImage ? "#4DFFFFFF" : Theme.c.borderStrong
+                opacity: cover.ready ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.motion.slow } }
+                MediaImage {
+                    id: cover
+                    objectName: "stageCover"
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    source: Backend.stageCover
+                    gif: Backend.stageCoverGif
+                    fillMode: Image.Stretch
+                }
+            }
         }
         Label {
             id: current

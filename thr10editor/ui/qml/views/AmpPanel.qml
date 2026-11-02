@@ -62,6 +62,14 @@ Card {
             elide: Text.ElideRight
             Layout.maximumWidth: root.width * 0.35
         }
+        IconButton {
+            objectName: "moduleMediaButton"
+            iconName: "image"
+            boxSize: Theme.size.control * 0.85
+            iconColor: mediaBox.has ? Theme.c.textMuted : Theme.c.textFaint
+            tip: mediaBox.has ? "Заменить картинку блока" : "Добавить фото или GIF в блок (или перетащите файл на карточку)"
+            onClicked: mediaBox.pick()
+        }
         Label {
             text: "КАБИНЕТ"
             font.pixelSize: Theme.fontSize.xs
@@ -87,28 +95,61 @@ Card {
     // разделитель
     Rectangle { Layout.fillWidth: true; height: 1; color: Theme.c.border }
 
+    // ручки и картинка блока: картинка справа, если ручки помещаются в один ряд,
+    // иначе — полосой под ручками
     GridLayout {
+        id: ampBody
         Layout.fillWidth: true
         Layout.topMargin: Theme.space.xs
-        readonly property int cell: Theme.size.knobLarge + Theme.space.xl
-        columns: Math.max(1, Math.min(5, Math.floor((width + Theme.space.lg) / cell)))
-        columnSpacing: Theme.space.lg
+        columnSpacing: Theme.space.xl
         rowSpacing: Theme.space.lg
-        Repeater {
-            model: ["amp.gain", "amp.master", "amp.bass", "amp.middle", "amp.treble"]
-            delegate: Item {
-                required property string modelData
-                Layout.fillWidth: true
-                implicitHeight: knob.implicitHeight
-                implicitWidth: knob.implicitWidth
-                Knob {
-                    id: knob
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    param: Backend.param(modelData)
-                    diameter: Theme.size.knobLarge
-                    onContextRequested: (p, x, y) => root.knobContext(p, this, x, y)
+        readonly property real knobRowWidth: 5 * (Theme.size.knobLarge + Theme.space.xl) - Theme.space.lg
+        readonly property real mediaWidth: Theme.size.knobLarge * 2.4
+        readonly property bool side: width >= knobRowWidth + columnSpacing + mediaWidth
+        columns: !mediaBox.has || side ? 2 : 1
+
+        GridLayout {
+            id: knobsGrid
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
+            readonly property int cell: Theme.size.knobLarge + Theme.space.xl
+            columns: Math.max(1, Math.min(5, Math.floor((width + Theme.space.lg) / cell)))
+            columnSpacing: Theme.space.lg
+            rowSpacing: Theme.space.lg
+            Repeater {
+                model: ["amp.gain", "amp.master", "amp.bass", "amp.middle", "amp.treble"]
+                delegate: Item {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    implicitHeight: knob.implicitHeight
+                    implicitWidth: knob.implicitWidth
+                    Knob {
+                        id: knob
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        param: Backend.param(modelData)
+                        diameter: Theme.size.knobLarge
+                        onContextRequested: (p, x, y) => root.knobContext(p, this, x, y)
+                    }
                 }
             }
         }
+
+        // фото или GIF усилителя — растягивается на свою область без обрезки
+        ModuleMedia {
+            id: mediaBox
+            groupKey: "amp"
+            title: "Усилитель"
+            aspect: ampBody.side ? 0 : 3
+            Layout.fillWidth: !ampBody.side
+            Layout.fillHeight: ampBody.side
+            Layout.preferredWidth: ampBody.side ? ampBody.mediaWidth : -1
+            Layout.minimumHeight: ampBody.side ? Theme.size.knobLarge : 0
+        }
+    }
+
+    MediaDropArea {
+        parent: root
+        anchors.fill: parent
+        media: mediaBox
     }
 }

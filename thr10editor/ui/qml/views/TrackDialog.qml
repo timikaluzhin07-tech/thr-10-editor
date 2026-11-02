@@ -5,7 +5,8 @@ import QtQuick.Dialogs
 import THR10
 import "../components"
 
-// Данные трека сет-листа для режима «Сцена»: строй, аккорды, фон.
+// Данные трека сет-листа для режима «Сцена»: строй, аккорды, фон и обложка
+// (картинка или GIF).
 // Поля сохраняются при завершении ввода (клик вне поля / Enter / закрытие).
 AppDialog {
     id: root
@@ -61,31 +62,38 @@ AppDialog {
         font.pixelSize: Theme.fontSize.xs
     }
 
-    SectionLabel { text: "Фон в режиме «Сцена»"; Layout.topMargin: Theme.space.sm }
-    RowLayout {
+    // строка выбора картинки/GIF: превью, «Выбрать/Заменить», «Убрать»
+    component MediaRow: RowLayout {
+        id: mr
+        property string field: "background"
+        property bool has: false
+        property url source: ""
+        property bool gif: false
+        property real previewAspect: 16 / 9
+        property string emptyText: ""
+        property string removeText: ""
+        property string hint: ""
         Layout.fillWidth: true
         spacing: Theme.space.md
         Rectangle {
-            Layout.preferredWidth: Theme.size.control * 5.3
             Layout.preferredHeight: Theme.size.control * 3
+            Layout.preferredWidth: Layout.preferredHeight * mr.previewAspect
             radius: Theme.radius.md
             color: Theme.c.surface2
             border.width: 1
             border.color: Theme.c.border
-            clip: true
-            Image {
+            MediaImage {
                 anchors.fill: parent
                 anchors.margins: 1
-                visible: root.track && root.track.hasBackground
-                source: root.track ? root.track.background : ""
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
+                visible: mr.has
+                source: mr.has ? mr.source : ""
+                gif: mr.gif
+                fillMode: Image.Stretch
             }
             Label {
                 anchors.centerIn: parent
-                visible: !(root.track && root.track.hasBackground)
-                text: "Без фона"
+                visible: !mr.has
+                text: mr.emptyText
                 color: Theme.c.textFaint
                 font.pixelSize: Theme.fontSize.sm
             }
@@ -93,25 +101,48 @@ AppDialog {
         ColumnLayout {
             spacing: Theme.space.xs
             AppButton {
-                text: root.track && root.track.hasBackground ? "Заменить…" : "Выбрать картинку…"
-                iconName: "import"
-                onClicked: imageDialog.open()
+                text: mr.has ? "Заменить…" : "Выбрать картинку или GIF…"
+                iconName: "image"
+                onClicked: { imageDialog.field = mr.field; imageDialog.open() }
             }
             AppButton {
-                visible: root.track && root.track.hasBackground
+                visible: mr.has
                 variant: "ghost"
-                text: "Убрать фон"
+                text: mr.removeText
                 iconName: "trash"
-                onClicked: Backend.clearTrackBackground(root.trackIndex)
+                onClicked: Backend.clearTrackMedia(root.trackIndex, mr.field)
             }
             Label {
                 Layout.maximumWidth: Theme.space.xxxl * 4.5
-                text: "PNG, JPG или WEBP. Картинка копируется в папку данных программы."
+                text: mr.hint
                 color: Theme.c.textFaint
                 font.pixelSize: Theme.fontSize.xs
                 wrapMode: Text.Wrap
             }
         }
+    }
+
+    SectionLabel { text: "Фон в режиме «Сцена»"; Layout.topMargin: Theme.space.sm }
+    MediaRow {
+        field: "background"
+        has: root.track ? root.track.hasBackground : false
+        source: root.track ? root.track.background : ""
+        gif: root.track ? root.track.backgroundGif : false
+        emptyText: "Без фона"
+        removeText: "Убрать фон"
+        hint: "PNG, JPG, WEBP или GIF. Растягивается на весь экран (без обрезки) и слегка затемняется."
+    }
+
+    SectionLabel { text: "Обложка трека"; Layout.topMargin: Theme.space.sm }
+    MediaRow {
+        field: "cover"
+        previewAspect: 1
+        has: root.track ? root.track.hasCover : false
+        source: root.track ? root.track.cover : ""
+        gif: root.track ? root.track.coverGif : false
+        emptyText: "Нет"
+        removeText: "Убрать обложку"
+        hint: "Показывается по центру поверх фона. Файлы копируются в папку данных программы."
     }
 
     footer: [
@@ -121,9 +152,10 @@ AppDialog {
 
     FileDialog {
         id: imageDialog
-        title: "Фон для трека"
+        property string field: "background"
+        title: field === "cover" ? "Обложка трека" : "Фон для трека"
         fileMode: FileDialog.OpenFile
-        nameFilters: ["Картинки (*.png *.jpg *.jpeg *.webp)", "Все файлы (*)"]
-        onAccepted: Backend.setTrackBackground(root.trackIndex, selectedFile)
+        nameFilters: ["Картинки и GIF (*.png *.jpg *.jpeg *.webp *.gif)", "Все файлы (*)"]
+        onAccepted: Backend.setTrackMedia(root.trackIndex, field, selectedFile)
     }
 }

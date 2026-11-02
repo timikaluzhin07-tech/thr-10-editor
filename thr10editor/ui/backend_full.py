@@ -638,18 +638,45 @@ class FullBackend(Backend):
         path = os.path.join(self.data_dir, "backgrounds", name)
         return QUrl.fromLocalFile(path).toString() if os.path.exists(path) else ""
 
+    def _module_media(self) -> dict[str, str]:
+        mm = self.settings.get("module_media") or {}
+        return {str(k): str(v) for k, v in mm.items() if v} if isinstance(mm, dict) else {}
+
     def _cleanup_backgrounds(self) -> None:
-        """Удалить скопированные фоны, на которые больше не ссылается ни один трек."""
+        """Удалить скопированные картинки, на которые больше ничто не ссылается
+        (фоны и обложки треков, медиа в карточках модулей)."""
         d = os.path.join(self.data_dir, "backgrounds")
         if not os.path.isdir(d):
             return
-        used = self.library.referenced_backgrounds()
+        used = self.library.referenced_backgrounds() | set(self._module_media().values())
         for name in os.listdir(d):
             if name not in used:
                 try:
                     os.remove(os.path.join(d, name))
                 except OSError:
-                    log.warning("не удалось удалить фон %s", name)
+                    log.warning("не удалось удалить картинку %s", name)
+
+    def _import_media(self, url: Any) -> str | None:
+        """Проверить картинку/GIF и скопировать в папку данных. Имя файла или None."""
+        src = url_to_path(url)
+        ext = os.path.splitext(src)[1].lower()
+        if ext not in BACKGROUND_EXTENSIONS:
+            self.toast.emit("error", "Поддерживаются картинки PNG, JPG, WEBP и GIF")
+            return None
+        if QImageReader(src).size().isEmpty():
+            self.toast.emit("error", "Не удалось прочитать картинку")
+            return None
+        name = new_id() + (".jpg" if ext == ".jpeg" else ext)
+        try:
+            shutil.copyfile(src, os.path.join(self._bg_dir(), name))
+        except OSError as e:
+            self.toast.emit("error", f"Не удалось скопировать картинку: {e}")
+            return None
+        return name
+
+    @staticmethod
+    def _is_gif(name: str) -> bool:
+        return name.lower().endswith(".gif")
 
     def _track(self, index: int) -> Any:
         s = self.library.get_setlist(self.currentSetlistId)
@@ -669,7 +696,11 @@ class FullBackend(Backend):
                         "summary": summary(p.values) if p else "", "missing": p is None,
                         "chords": t.chords, "tuning": t.tuning,
                         "background": self._bg_url(t.background),
-                        "hasBackground": bool(t.background)})
+                        "hasBackground": bool(t.background),
+                        "backgroundGif": self._is_gif(t.background),
+                        "cover": self._bg_url(t.cover),
+                        "hasCover": bool(t.cover),
+                        "coverGif": self._is_gif(t.cover)})
         return out
 
     @Property("QStringList", constant=True)
@@ -689,42 +720,74 @@ class FullBackend(Backend):
             self.setlistChanged.emit()
             self.stageChanged.emit()
 
-    @Slot(int, "QVariant", result=bool)
-    def setTrackBackground(self, index: int, url: Any) -> bool:  # noqa: N802
-        """Скопировать картинку в папку данных и назначить фоном трека."""
+    @Slot(int, str, "QVariant", result=bool)
+    def setTrackMedia(self, index: int, field: str, url: Any) -> bool:  # noqa: N802
+        """Фон (background) или обложка (cover) трека: копия картинки/GIF в папке данных."""
         t = self._track(index)
-        if t is None:
+        if t is None or field not in ("background", "cover"):
             return False
-        src = url_to_path(url)
-        ext = os.path.splitext(src)[1].lower()
-        if ext not in BACKGROUND_EXTENSIONS:
-            self.toast.emit("error", "Поддерживаются картинки PNG, JPG и WEBP")
+        name = self._import_media(url)
+        if name is None:
             return False
-        if QImageReader(src).size().isEmpty():
-            self.toast.emit("error", "Не удалось прочитать картинку")
-            return False
-        name = new_id() + (".jpg" if ext == ".jpeg" else ext)
-        try:
-            shutil.copyfile(src, os.path.join(self._bg_dir(), name))
-        except OSError as e:
-            self.toast.emit("error", f"Не удалось скопировать картинку: {e}")
-            return False
-        t.background = name
+        setattr(t, field, name)
         self._save_library()
         self._cleanup_backgrounds()
         self.setlistChanged.emit()
         self.stageChanged.emit()
         return True
 
-    @Slot(int)
-    def clearTrackBackground(self, index: int) -> None:  # noqa: N802
+    @Slot(int, str)
+    def clearTrackMedia(self, index: int, field: str) -> None:  # noqa: N802
         t = self._track(index)
-        if t is not None and t.background:
-            t.background = ""
+        if t is not None and field in ("background", "cover") and getattr(t, field):
+            setattr(t, field, "")
             self._save_library()
             self._cleanup_backgrounds()
             self.setlistChanged.emit()
             self.stageChanged.emit()
+
+    @Slot(int, "QVariant", result=bool)
+    def setTrackBackground(self, index: int, url: Any) -> bool:  # noqa: N802
+        return self.setTrackMedia(index, "background", url)
+
+    @Slot(int)
+    def clearTrackBackground(self, index: int) -> None:  # noqa: N802
+        self.clearTrackMedia(index, "background")
+
+    # ---- картинка/GIF в карточке модуля (общая для всех пресетов) ---------------
+    moduleMediaChanged = Signal()
+
+    @Property("QVariantMap", notify=moduleMediaChanged)
+    def moduleMedia(self) -> dict[str, Any]:  # noqa: N802
+        """{группа: {"url", "gif"}} — только для модулей, где картинка задана."""
+        out = {}
+        for g, name in self._module_media().items():
+            url = self._bg_url(name)
+            if url:
+                out[g] = {"url": url, "gif": self._is_gif(name)}
+        return out
+
+    @Slot(str, "QVariant", result=bool)
+    def setModuleMedia(self, group: str, url: Any) -> bool:  # noqa: N802
+        if group not in GROUPS_BY_KEY:
+            return False
+        name = self._import_media(url)
+        if name is None:
+            return False
+        mm = self._module_media()
+        mm[group] = name
+        self.settings.set("module_media", mm)
+        self._cleanup_backgrounds()
+        self.moduleMediaChanged.emit()
+        return True
+
+    @Slot(str)
+    def clearModuleMedia(self, group: str) -> None:  # noqa: N802
+        mm = self._module_media()
+        if mm.pop(group, None) is not None:
+            self.settings.set("module_media", mm)
+            self._cleanup_backgrounds()
+            self.moduleMediaChanged.emit()
 
     @Slot(str)
     def newSetlist(self, name: str) -> None:  # noqa: N802
@@ -834,6 +897,21 @@ class FullBackend(Backend):
     def stageBackground(self) -> str:  # noqa: N802
         t = self.player.current if self._stage else None
         return self._bg_url(t.background) if t else ""
+
+    @Property(bool, notify=stageChanged)
+    def stageBackgroundGif(self) -> bool:  # noqa: N802
+        t = self.player.current if self._stage else None
+        return bool(t) and self._is_gif(t.background)
+
+    @Property(str, notify=stageChanged)
+    def stageCover(self) -> str:  # noqa: N802
+        t = self.player.current if self._stage else None
+        return self._bg_url(t.cover) if t else ""
+
+    @Property(bool, notify=stageChanged)
+    def stageCoverGif(self) -> bool:  # noqa: N802
+        t = self.player.current if self._stage else None
+        return bool(t) and self._is_gif(t.cover)
 
     @Slot(int)
     def startStage(self, index: int) -> None:  # noqa: N802

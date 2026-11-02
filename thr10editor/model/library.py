@@ -23,7 +23,8 @@ TUNING_SUGGESTIONS = (
     "Drop D", "Drop C#", "Drop C", "Drop B", "Open G", "Open D", "Open E", "DADGAD",
 )
 
-BACKGROUND_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
+# Картинки для фона, обложки трека и медиа в карточках модулей. GIF — анимированный.
+BACKGROUND_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 
 
 @dataclass
@@ -34,10 +35,11 @@ class SetlistTrack:
     chords: str = ""  # аккорды, свободный многострочный текст
     tuning: str = ""  # строй гитары («Drop D» и т. п.)
     background: str = ""  # имя файла фона в папке данных (backgrounds/…)
+    cover: str = ""  # обложка трека (по центру поверх фона), там же
 
     def to_dict(self) -> dict[str, Any]:
         return {"preset": self.preset, "chords": self.chords, "tuning": self.tuning,
-                "background": self.background}
+                "background": self.background, "cover": self.cover}
 
     @classmethod
     def from_any(cls, d: Any) -> "SetlistTrack | None":
@@ -46,7 +48,8 @@ class SetlistTrack:
         if isinstance(d, dict) and d.get("preset"):
             return cls(preset=str(d["preset"]), chords=str(d.get("chords", "")),
                        tuning=str(d.get("tuning", "")),
-                       background=str(d.get("background", "")))
+                       background=str(d.get("background", "")),
+                       cover=str(d.get("cover", "")))
         return None
 
 
@@ -332,7 +335,7 @@ class Library:
 
     def referenced_backgrounds(self) -> set[str]:
         """Файлы фонов, на которые ссылаются треки (остальные можно удалить)."""
-        return {t.background for s in self.setlists for t in s.items if t.background}
+        return {f for s in self.setlists for t in s.items for f in (t.background, t.cover) if f}
 
 
 def touch_all(presets: Iterable[Preset]) -> None:

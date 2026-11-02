@@ -53,5 +53,21 @@ def test_stage_keyboard_and_track_data(tmp_path):
     # пробел, пробел → 1, 2; ← ↑ → 1, 0; → ↓ PgDn → 1, 2, 3; PgUp → 2
     assert r["indices"] == [1, 2, 1, 0, 1, 2, 3, 2]
     assert r["chords_shown"] and r["tuning_shown"]
-    assert r["bg_fill_crop"] and r["bg_ready"]
+    # фон растягивается на весь экран без обрезки; обложка — GIF по центру
+    assert r["bg_stretch"] and r["bg_ready"]
+    assert r["cover_class"].startswith("QQuickAnimatedImage") and r["cover_ready"]
+    assert r["cover_playing"] and r["cover_centered"]
     assert r["active_after_esc"] is False
+
+
+def test_module_media_widget_in_cards(tmp_path):
+    r = run_scenario("modulemedia", tmp_path)
+    # 6 модулей (усилитель + 5 эффектов): у каждого кнопка в заголовке, пустые места скрыты
+    assert r["boxes"] == 6 and r["buttons"] == 6 and r["visible_before"] == 0
+    assert r["shown"] == ["amp", "mod"]
+    mod, amp = r["media"]["mod"], r["media"]["amp"]
+    assert mod["cls"].startswith("QQuickAnimatedImage") and mod["ready"] and mod["stretch"]
+    assert amp["cls"].startswith("QQuickImage") and amp["ready"] and amp["stretch"]
+    assert mod["h"] > 0 and abs(mod["w"] / mod["h"] - 2) < 0.1  # область 2:1 по ширине карточки
+    assert amp["h"] > 0 and amp["w"] > 0
+    assert r["after_clear"] == ["amp"]

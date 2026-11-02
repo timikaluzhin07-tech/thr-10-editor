@@ -146,3 +146,24 @@ def test_track_data_roundtrip_and_backgrounds(lib):
     assert again.referenced_backgrounds() == {"x.webp"}
     again.remove(pid)  # трек удалённого пресета исчезает вместе с фоном
     assert again.referenced_backgrounds() == set()
+
+
+def test_track_cover_roundtrip_and_referenced(lib):
+    s = lib.add_setlist("Обложки")
+    pid = next(iter(lib.presets))
+    t = s.add(pid)
+    t.background, t.cover = "bg.gif", "cover.png"
+    lib.save()
+    again = Library(lib.path)
+    t2 = again.setlists[0].items[0]
+    assert (t2.background, t2.cover) == ("bg.gif", "cover.png")
+    assert again.referenced_backgrounds() == {"bg.gif", "cover.png"}
+    # старый файл без поля cover читается
+    assert SetlistTrack.from_any({"preset": "a", "background": "x.png"}).cover == ""
+
+
+def test_gif_is_allowed_media():
+    from thr10editor.model.library import BACKGROUND_EXTENSIONS
+
+    assert ".gif" in BACKGROUND_EXTENSIONS and ".png" in BACKGROUND_EXTENSIONS
+    assert not any(e in BACKGROUND_EXTENSIONS for e in (".mp4", ".webm", ".avi"))

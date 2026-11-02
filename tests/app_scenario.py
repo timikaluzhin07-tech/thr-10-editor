@@ -96,7 +96,7 @@ def scenario_learn(app, backend, window):
 
 
 def scenario_stage(app, backend, window):
-    from PySide6.QtCore import QMetaObject, Q_ARG, QObject
+    from PySide6.QtCore import QMetaObject, Q_ARG, QObject, QPointF
     from PySide6.QtGui import QColor, QImage
 
     from thr10editor.model.preset import Preset
@@ -113,6 +113,10 @@ def scenario_stage(app, backend, window):
     path = os.path.join(os.environ["THR10EDITOR_HOME"], "bg_src.png")
     img.save(path)
     backend.setTrackBackground(1, path)
+    from gif_sample import write_gif
+    cover = os.path.join(os.environ["THR10EDITOR_HOME"], "cover_src.gif")
+    write_gif(cover, 3)
+    backend.setTrackMedia(1, "cover", cover)
     # как у пользователя: фокус стоит на кнопке, с которой открывают сцену
     buttons = [o for o in window.findChildren(QObject)
                if o.metaObject().className().startswith("AppButton") and o.property("visible")]
@@ -133,20 +137,80 @@ def scenario_stage(app, backend, window):
              if o.metaObject().className().startswith("QQuickLabel") or "Label" in o.metaObject().className()]
     result["chords_shown"] = "Am – F – C – G" in texts
     result["tuning_shown"] = "Drop D" in texts
-    imgs = [o for o in stage.findChildren(QObject) if "QQuickImage" in o.metaObject().className()]
-    if imgs:
-        im = imgs[0]
-        result["bg_ready"] = im.property("progress") == 1.0 and im.property("visible")
-        # PreserveAspectCrop: картинка покрывает экран целиком, пропорции сохранены (2:1)
+    QTest.qWait(300)
+
+    def media(name):
+        box = next(o for o in stage.findChildren(QObject) if o.objectName() == name)
+        imgs = [o for o in box.findChildren(QObject) if o.metaObject().className() in ("QQuickImage", "QQuickAnimatedImage")]
+        return box, (imgs[0] if imgs else None)
+
+    box, im = media("stageBackground")
+    result["bg_ready"] = bool(im) and im.property("progress") == 1.0 and box.property("visible")
+    if im:
+        # Image.Stretch: картинка 2:1 занимает ровно всю область, пропорции не сохраняются
         pw, ph = im.property("paintedWidth"), im.property("paintedHeight")
         w, h = im.width(), im.height()
-        result["bg_fill_crop"] = (pw >= w - 1 and ph >= h - 1 and abs(pw / ph - 2.0) < 0.02)
-    else:
-        result["bg_ready"] = result["bg_fill_crop"] = False
+        result["bg_stretch"] = (abs(pw - w) < 1 and abs(ph - h) < 1 and w == window.width()
+                                and abs(w / h - 2.0) > 0.05)
+    box, im = media("stageCover")
+    result["cover_class"] = im.metaObject().className() if im else ""
+    result["cover_ready"] = bool(im) and im.property("progress") == 1.0 and box.property("ready")
+    result["cover_playing"] = bool(im) and bool(im.property("playing")) and im.property("frameCount") == 3
+    if im:
+        cx = box.mapToScene(QPointF(box.width() / 2, 0)).x()
+        result["cover_centered"] = abs(cx - window.width() / 2) < 2 and abs(box.width() - box.height()) < 2
     if os.environ.get("SHOT"):
         window.grabWindow().save(os.environ["SHOT"])
     key(window, Qt.Key.Key_Escape)
     result["active_after_esc"] = backend.stageActive
+
+
+def scenario_modulemedia(app, backend, window):
+    from PySide6.QtCore import QObject
+    from PySide6.QtGui import QColor, QImage
+
+    from gif_sample import write_gif
+
+    home = os.environ["THR10EDITOR_HOME"]
+    gif = write_gif(os.path.join(home, "mod.gif"), 3)
+    img = QImage(90, 30, QImage.Format.Format_RGB32)
+    img.fill(QColor("#335577"))
+    png = os.path.join(home, "amp.png")
+    img.save(png)
+
+    def items():  # обход по дереву элементов: делегаты Repeater не всегда QObject-дети окна
+        out, stack = [], [window.contentItem()]
+        while stack:
+            it = stack.pop()
+            out.append(it)
+            stack.extend(it.childItems())
+        return out
+
+    def boxes():
+        return [o for o in items() if o.metaObject().className().startswith("ModuleMedia")]
+
+    result["boxes"] = len(boxes())
+    result["visible_before"] = sum(bool(o.property("visible")) for o in boxes())
+    result["buttons"] = len([o for o in items() if o.objectName() == "moduleMediaButton"])
+    backend.setModuleMedia("mod", gif)
+    backend.setModuleMedia("amp", png)
+    QTest.qWait(300)
+    shown = {o.property("groupKey"): o for o in boxes() if o.property("visible")}
+    result["shown"] = sorted(shown)
+    out = {}
+    for g, o in shown.items():
+        im = next(c for c in o.findChildren(QObject)
+                  if c.metaObject().className() in ("QQuickImage", "QQuickAnimatedImage"))
+        out[g] = {"cls": im.metaObject().className(), "ready": im.property("progress") == 1.0,
+                  "stretch": abs(im.property("paintedWidth") - im.width()) < 1
+                  and abs(im.property("paintedHeight") - im.height()) < 1,
+                  "h": o.height(), "w": o.width()}
+    result["media"] = out
+    if os.environ.get("SHOT"):
+        window.grabWindow().save(os.environ["SHOT"])
+    backend.clearModuleMedia("mod")
+    QTest.qWait(50)
+    result["after_clear"] = sorted(o.property("groupKey") for o in boxes() if o.property("visible"))
 
 
 def scenario_trackdialog(app, backend, window):
