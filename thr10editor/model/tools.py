@@ -167,12 +167,15 @@ def delay_value_for(interval_ms: float, subdivision: str = "1/4") -> tuple[int, 
 
 @dataclass
 class RandomizerConfig:
+    """Настройки рандомайзера.
+
+    Меняются все параметры — ручки, вкл/выкл блоков и выбор из списка (модель,
+    кабинет, типы эффектов, Ratio/Knee), кроме заблокированных (locked).
+    """
+
     amount: float = 1.0  # 0..1: насколько далеко от текущего звука
     locked: set[str] = field(default_factory=lambda: {"amp.master"})
     bounds: dict[str, tuple[float, float]] = field(default_factory=dict)  # положения 0..1
-    include_types: bool = False  # типы эффектов
-    include_switches: bool = False  # вкл/выкл блоков
-    include_amp: bool = False  # модель усилителя и кабинет
 
     def bounds_for(self, key: str) -> tuple[float, float]:
         lo, hi = self.bounds.get(key, (0.0, 1.0))
@@ -182,7 +185,13 @@ class RandomizerConfig:
 
 def randomize(values: Mapping[str, int], cfg: RandomizerConfig,
               rng: random.Random | None = None) -> dict[str, int]:
-    """Новые значения. Заблокированные параметры не меняются; границы — в положениях ручки."""
+    """Новые значения для всех незаблокированных параметров.
+
+    * Ручки: шаг к случайной цели внутри границ (в положениях ручки) на долю amount.
+    * Вкл/выкл и выбор из списка: с вероятностью amount выбирается случайное
+      значение (при amount = 1 — всегда).
+    Заблокированные параметры (cfg.locked) не меняются никогда.
+    """
     rng = rng or random.Random()
     current = normalize_values(values)
     out = dict(current)
@@ -196,16 +205,7 @@ def randomize(values: Mapping[str, int], cfg: RandomizerConfig,
             target = rng.uniform(lo, hi)
             new_pos = max(lo, min(hi, pos + amount * (target - pos)))
             out[key] = from_position(p, new_pos)
-        elif p.kind is Kind.SWITCH:
-            if cfg.include_switches:
-                out[key] = rng.randint(0, 1)
-        elif p.kind is Kind.CHOICE:
-            if key in TYPE_KEYS:
-                if not cfg.include_types:
-                    continue
-            elif key in ("amp.model", "amp.cab"):
-                if not cfg.include_amp:
-                    continue
+        elif amount >= 1.0 or rng.random() < amount:
             out[key] = rng.randint(p.minimum, p.maximum)
     return out
 

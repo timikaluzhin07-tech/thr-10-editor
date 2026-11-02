@@ -16,7 +16,7 @@ from thr10editor.model.tools import (
     randomize,
     wave,
 )
-from thr10editor.protocol.params import PARAMS, TYPE_KEYS, Kind, default_values
+from thr10editor.protocol.params import PARAMS, Kind, default_values
 from thr10editor.transport.controller_input import Binding, ControlEvent, ControllerMapper
 
 
@@ -111,17 +111,55 @@ def test_delay_value_clamped():
 
 # ---- рандомайзер ---------------------------------------------------------------------
 
-def test_randomize_respects_locks_and_defaults():
+def _discrete_keys():
+    return [k for k, p in PARAMS.items() if p.kind is not Kind.RANGE]
+
+
+def test_randomize_default_lock_is_master_only():
     cfg = RandomizerConfig()
-    cur = V(amp__master=33, amp__model=4, comp__type=1)
-    out = randomize(cur, cfg, random.Random(1))
-    assert out["amp.master"] == 33  # замок по умолчанию — громкость
-    assert out["amp.model"] == 4  # модель не трогаем без include_amp
-    for k in TYPE_KEYS:
-        assert out[k] == cur[k]
-    for k in ("comp.on", "mod.on", "delay.on", "reverb.on", "gate.on"):
-        assert out[k] == cur[k]
-    assert sum(out[k] != cur[k] for k in PARAMS) > 10
+    assert cfg.locked == {"amp.master"}
+    cur = V(amp__master=33)
+    for seed in range(20):
+        assert randomize(cur, cfg, random.Random(seed))["amp.master"] == 33
+
+
+def test_randomize_changes_switches_and_choices():
+    """Вкл/выкл блоков, модель, кабинет, типы эффектов и Ratio/Knee тоже меняются."""
+    cfg = RandomizerConfig()
+    rng = random.Random(0)
+    seen: dict[str, set[int]] = {k: set() for k in _discrete_keys()}
+    for _ in range(80):
+        out = randomize(default_values(), cfg, rng)
+        for k in seen:
+            seen[k].add(out[k])
+    for k, vals in seen.items():
+        p = PARAMS[k]
+        assert len(vals) == p.maximum - p.minimum + 1, (k, vals)  # встретились все варианты
+
+
+def test_randomize_locks_work_for_switches_and_choices():
+    locked = {"delay.on", "reverb.on", "amp.model", "mod.type", "amp.cab", "comp.rack.ratio"}
+    cfg = RandomizerConfig(locked=locked)
+    cur = V(delay__on=1, reverb__on=0, amp__model=4, mod__type=2, amp__cab=5,
+            comp__rack__ratio=3)
+    rng = random.Random(5)
+    for _ in range(60):
+        out = randomize(cur, cfg, rng)
+        for k in locked:
+            assert out[k] == cur[k], k
+    # незаблокированные переключатели при этом меняются
+    outs = [randomize(cur, cfg, random.Random(i)) for i in range(30)]
+    assert {o["gate.on"] for o in outs} == {0, 1}
+    assert len({o["comp.type"] for o in outs}) == 2
+
+
+def test_randomize_amount_is_probability_for_discrete():
+    cur = default_values()
+    never = RandomizerConfig(locked=set(), amount=0.0)
+    for i in range(20):
+        out = randomize(cur, never, random.Random(i))
+        for k in _discrete_keys():
+            assert out[k] == cur[k]
 
 
 def test_randomize_bounds_and_amount():
@@ -135,19 +173,8 @@ def test_randomize_bounds_and_amount():
     assert abs(out["amp.bass"] - 50) <= 6
 
 
-def test_randomize_includes_types_when_asked():
-    cfg = RandomizerConfig(include_types=True, include_switches=True, include_amp=True)
-    seen = set()
-    rng = random.Random(0)
-    for _ in range(40):
-        out = randomize(default_values(), cfg, rng)
-        seen.add((out["reverb.type"], out["delay.on"], out["amp.model"]))
-    assert len(seen) > 10
-
-
 def test_randomize_values_always_valid():
-    cfg = RandomizerConfig(locked=set(), include_types=True, include_switches=True,
-                           include_amp=True)
+    cfg = RandomizerConfig(locked=set())
     rng = random.Random(42)
     for _ in range(100):
         out = randomize(default_values(), cfg, rng)

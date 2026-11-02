@@ -61,27 +61,15 @@ Rectangle {
                         Layout.preferredWidth: Theme.space.xxl
                     }
                 }
-                component Opt: RowLayout {
-                    property alias checked: sw.checked
-                    property alias text: lbl.text
-                    signal toggled(bool on)
-                    spacing: Theme.space.sm
-                    ToggleSwitch { id: sw; onToggled: parent.toggled(checked) }
-                    Label { id: lbl; color: Theme.c.text; font.pixelSize: Theme.fontSize.sm; Layout.fillWidth: true; wrapMode: Text.Wrap }
-                }
-                Opt { text: "Менять типы эффектов"; checked: Backend.randomTypes; onToggled: (on) => Backend.randomTypes = on }
-                Opt { text: "Включать/выключать блоки"; checked: Backend.randomSwitches; onToggled: (on) => Backend.randomSwitches = on }
-                Opt { text: "Менять модель и кабинет"; checked: Backend.randomAmp; onToggled: (on) => Backend.randomAmp = on }
-
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.topMargin: Theme.space.sm
                     SectionLabel { text: "Границы и замки"; Layout.fillWidth: true }
-                    AppButton { compact: true; variant: "ghost"; text: "Сброс"; onClicked: Backend.resetRandomBounds() }
+                    AppButton { compact: true; variant: "ghost"; text: "Сброс границ"; onClicked: Backend.resetRandomBounds() }
                 }
                 Label {
                     Layout.fillWidth: true
-                    text: "Замок — параметр не меняется (по умолчанию Master, чтобы не было резкого скачка громкости). Замок ставится и правым кликом по ручке."
+                    text: "Меняются ручки, вкл/выкл блоков и выбор из списка (модель, кабинет, типы эффектов). Замок — параметр не меняется; по умолчанию заблокирован Master, чтобы не было резкого скачка громкости. На ручке замок ставится и правым кликом. «Сила» для переключателей и списков — вероятность смены."
                     color: Theme.c.textFaint
                     font.pixelSize: Theme.fontSize.xs
                     wrapMode: Text.Wrap
@@ -122,8 +110,17 @@ Rectangle {
                             Layout.preferredWidth: Theme.space.xxxl * 2.35
                             elide: Text.ElideRight
                         }
+                        Label {
+                            visible: rp.modelData.kind !== "range"
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignRight
+                            text: rp.modelData.kind === "switch" ? "вкл / выкл" : rp.p.options.length + " вариантов"
+                            color: Theme.c.textFaint
+                            font.pixelSize: Theme.fontSize.xs
+                        }
                         AppRangeSlider {
                             id: rs
+                            visible: rp.modelData.kind === "range"
                             Layout.fillWidth: true
                             enabled: !rp.modelData.locked
                             accent: Theme.c[rp.modelData.accent]

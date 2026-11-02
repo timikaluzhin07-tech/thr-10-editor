@@ -24,8 +24,7 @@ DEFAULTS: dict[str, Any] = {
     "tap_subdivision": "1/4",
     "lfo_rate_limit_hz": 20,
     "midi_controller": {"port": "", "next": None, "prev": None},
-    "randomizer": {"amount": 100, "locked": ["amp.master"], "bounds": {},
-                   "types": False, "switches": False, "amp": False},
+    "randomizer": {"amount": 100, "locked": ["amp.master"], "bounds": {}},
     "morph": {"duration": 4.0, "curve": "smooth"},
     "window": {"width": 1360, "height": 860, "maximized": False},
 }

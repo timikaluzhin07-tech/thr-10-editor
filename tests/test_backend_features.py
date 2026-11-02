@@ -221,14 +221,28 @@ def test_tap_tempo_sets_delay(b, monkeypatch):
 def test_randomizer_lock_and_undo(b):
     before = b.state.values
     b.param("amp.treble").toggleLock()
+    b.param("delay.on").toggleLock()
+    b.param("amp.model").toggleLock()
     assert b.param("amp.treble").locked and b.param("amp.master").locked
-    b.randomize()
-    after = b.state.values
-    assert after["amp.treble"] == before["amp.treble"]
-    assert after["amp.master"] == before["amp.master"]
-    assert after != before
-    b.undo()
+    for _ in range(15):
+        b.randomize()
+        after = b.state.values
+        for k in ("amp.treble", "amp.master", "delay.on", "amp.model"):
+            assert after[k] == before[k], k
+    assert b.state.values != before
+    for _ in range(15):
+        b.undo()
     assert b.state.values == before
+
+
+def test_randomizer_changes_switches_in_app(b):
+    seen = set()
+    for _ in range(20):
+        b.randomize()
+        seen.add((b.state["gate.on"], b.state["reverb.type"]))
+    assert len(seen) > 3
+    keys = {p["key"]: p for p in b.randomParams}
+    assert keys["gate.on"]["kind"] == "switch" and keys["amp.model"]["kind"] == "choice"
 
 
 def test_random_bounds_setting(b):

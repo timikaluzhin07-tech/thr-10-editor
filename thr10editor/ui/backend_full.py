@@ -115,10 +115,7 @@ class FullBackend(Backend):
             amount=max(0.0, min(1.0, float(rc.get("amount", 100)) / 100)),
             locked=set(rc.get("locked", ["amp.master"])) & set(PARAMS),
             bounds={k: (float(v[0]), float(v[1])) for k, v in (rc.get("bounds") or {}).items()
-                    if k in PARAMS and isinstance(v, (list, tuple)) and len(v) == 2},
-            include_types=bool(rc.get("types", False)),
-            include_switches=bool(rc.get("switches", False)),
-            include_amp=bool(rc.get("amp", False)))
+                    if k in PARAMS and isinstance(v, (list, tuple)) and len(v) == 2})
         self._rng = random.Random()
         # ---- морфинг
         ms = s.get("morph") or {}
@@ -900,9 +897,7 @@ class FullBackend(Backend):
     def _save_random(self, emit: bool = True) -> None:
         self.settings.set("randomizer", {
             "amount": round(self.rand.amount * 100), "locked": sorted(self.rand.locked),
-            "bounds": {k: list(v) for k, v in self.rand.bounds.items()},
-            "types": self.rand.include_types, "switches": self.rand.include_switches,
-            "amp": self.rand.include_amp})
+            "bounds": {k: list(v) for k, v in self.rand.bounds.items()}})
         if emit:
             self.randomChanged.emit()
 
@@ -935,44 +930,27 @@ class FullBackend(Backend):
         self.rand.amount = max(0, min(100, int(v))) / 100
         self._save_random()
 
-    @Property(bool, notify=randomChanged)
-    def randomTypes(self) -> bool:  # noqa: N802
-        return self.rand.include_types
-
-    @randomTypes.setter
-    def randomTypes(self, v: bool) -> None:  # noqa: N802
-        self.rand.include_types = bool(v)
-        self._save_random()
-
-    @Property(bool, notify=randomChanged)
-    def randomSwitches(self) -> bool:  # noqa: N802
-        return self.rand.include_switches
-
-    @randomSwitches.setter
-    def randomSwitches(self, v: bool) -> None:  # noqa: N802
-        self.rand.include_switches = bool(v)
-        self._save_random()
-
-    @Property(bool, notify=randomChanged)
-    def randomAmp(self) -> bool:  # noqa: N802
-        return self.rand.include_amp
-
-    @randomAmp.setter
-    def randomAmp(self, v: bool) -> None:  # noqa: N802
-        self.rand.include_amp = bool(v)
-        self._save_random()
-
     @Property("QVariantList", notify=randomChanged)
     def randomParams(self) -> list[dict[str, Any]]:  # noqa: N802
+        """Все параметры для панели рандомайзера: ручки (с границами), вкл/выкл и списки."""
         out = []
         prev_group = ""
         for k, p in PARAMS.items():
-            if p.kind is not Kind.RANGE:
-                continue
             lo, hi = self.rand.bounds_for(k)
             g = GROUPS_BY_KEY[p.group].title
             first, prev_group = g != prev_group, g
-            out.append({"key": k, "label": full_label(k), "group": g, "groupFirst": first,
+            if p.kind is Kind.SWITCH:
+                label = "Вкл/выкл блока"
+            elif k == "amp.model":
+                label = "Модель"
+            elif k == "amp.cab":
+                label = "Кабинет"
+            elif p.is_type_selector:
+                label = "Тип эффекта"
+            else:
+                label = full_label(k)
+            out.append({"key": k, "label": label, "group": g, "groupFirst": first,
+                        "kind": p.kind.value,
                         "accent": GROUPS_BY_KEY[p.group].accent, "lo": lo, "hi": hi,
                         "locked": k in self.rand.locked})
         return out
@@ -994,7 +972,7 @@ class FullBackend(Backend):
     @Slot(bool)
     def lockAll(self, locked: bool) -> None:  # noqa: N802
         if locked:
-            self.rand.locked = {k for k, p in PARAMS.items() if p.kind is Kind.RANGE}
+            self.rand.locked = set(PARAMS)
         else:
             self.rand.locked = {"amp.master"}
         self._refresh_flags()
