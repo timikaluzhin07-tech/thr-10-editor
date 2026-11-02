@@ -83,9 +83,10 @@ ApplicationWindow {
         { group: "Вид", seq: "Ctrl+T", text: "Панель инструментов", act: () => win.toolsVisible = !win.toolsVisible },
         { group: "MIDI-контроллер", seq: "Esc", text: "Отменить ожидание педали/клавиши контроллера", act: () => Backend.cancelControllerLearn(), when: () => Backend.controllerLearning !== "" && !Backend.stageActive },
         { group: "Сцена", seq: "F5", text: "Режим «Сцена» для текущего сет-листа", act: () => win.startStage(0), when: () => win.inEditor },
-        { group: "Сцена", seq: ["Right", "Down", "PgDown", "Space"], label: ["→", "↓", "PgDn", "Пробел"], text: "Следующий пресет", act: () => Backend.stageNext(), when: () => Backend.stageActive },
-        { group: "Сцена", seq: ["Left", "Up", "PgUp", "Backspace"], label: ["←", "↑", "PgUp"], text: "Предыдущий пресет", act: () => Backend.stagePrev(), when: () => Backend.stageActive },
-        { group: "Сцена", seq: "Esc", text: "Выйти из режима «Сцена»", act: () => win.stopStage(), when: () => Backend.stageActive },
+        // клавиши самой сцены обрабатывает StageView (Keys), здесь — только для справки
+        { group: "Сцена", seq: "", label: ["Пробел", "→", "↓", "PgDn"], text: "Следующий трек" },
+        { group: "Сцена", seq: "", label: ["←", "↑", "PgUp"], text: "Предыдущий трек" },
+        { group: "Сцена", seq: "", label: ["Esc"], text: "Выйти из режима «Сцена»" },
     ]
     readonly property var allShortcuts: shortcutList.concat(extraShortcuts)
 
@@ -102,8 +103,10 @@ ApplicationWindow {
     function startStage(index) {
         Backend.startStage(index)
         if (Backend.stageActive) {
-            visibilityBeforeStage = visibility
+            if (visibility !== Window.FullScreen)
+                visibilityBeforeStage = visibility
             visibility = Window.FullScreen
+            stageView.takeFocus()   // клавиши — режиму сцены, а не кнопке, с которой его открыли
         }
     }
     function stopStage() {
@@ -376,8 +379,10 @@ ApplicationWindow {
     }
 
     StageView {
+        id: stageView
         anchors.fill: parent
         z: 500
+        onExitRequested: win.stopStage()
     }
 
     // Ожидание педали MIDI-контроллера: клик в любом месте окна (включая ту же

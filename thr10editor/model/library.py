@@ -18,20 +18,62 @@ LIBRARY_FORMAT = "thr10editor.library"
 LIBRARY_VERSION = 1
 
 
+TUNING_SUGGESTIONS = (
+    "Standard E", "Eb Standard", "D Standard", "C# Standard", "C Standard",
+    "Drop D", "Drop C#", "Drop C", "Drop B", "Open G", "Open D", "Open E", "DADGAD",
+)
+
+BACKGROUND_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+@dataclass
+class SetlistTrack:
+    """Трек сет-листа: пресет + данные для сцены."""
+
+    preset: str  # id пресета библиотеки
+    chords: str = ""  # аккорды, свободный многострочный текст
+    tuning: str = ""  # строй гитары («Drop D» и т. п.)
+    background: str = ""  # имя файла фона в папке данных (backgrounds/…)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"preset": self.preset, "chords": self.chords, "tuning": self.tuning,
+                "background": self.background}
+
+    @classmethod
+    def from_any(cls, d: Any) -> "SetlistTrack | None":
+        if isinstance(d, str):  # формат до версии 1.2: только id пресета
+            return cls(d) if d else None
+        if isinstance(d, dict) and d.get("preset"):
+            return cls(preset=str(d["preset"]), chords=str(d.get("chords", "")),
+                       tuning=str(d.get("tuning", "")),
+                       background=str(d.get("background", "")))
+        return None
+
+
 @dataclass
 class Setlist:
     name: str
-    items: list[str] = field(default_factory=list)  # id пресетов по порядку
+    items: list[SetlistTrack] = field(default_factory=list)  # треки по порядку
     id: str = field(default_factory=new_id)
     notes: str = ""
 
+    def preset_ids(self) -> list[str]:
+        return [t.preset for t in self.items]
+
+    def add(self, preset_id: str) -> SetlistTrack:
+        t = SetlistTrack(preset_id)
+        self.items.append(t)
+        return t
+
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "name": self.name, "items": list(self.items), "notes": self.notes}
+        return {"id": self.id, "name": self.name, "items": [t.to_dict() for t in self.items],
+                "notes": self.notes}
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Setlist":
+        tracks = [SetlistTrack.from_any(x) for x in d.get("items", [])]
         return cls(name=str(d.get("name") or "Сет-лист"),
-                   items=[str(x) for x in d.get("items", []) if x],
+                   items=[t for t in tracks if t is not None],
                    id=str(d.get("id") or new_id()), notes=str(d.get("notes", "")))
 
 
@@ -127,7 +169,7 @@ class Library:
         if self.presets.pop(preset_id, None) is None:
             return False
         for s in self.setlists:
-            s.items = [i for i in s.items if i != preset_id]
+            s.items = [t for t in s.items if t.preset != preset_id]
         return True
 
     def duplicate(self, preset_id: str) -> Preset:
@@ -286,7 +328,11 @@ class Library:
 
     def setlist_presets(self, setlist_id: str) -> list[Preset | None]:
         s = self.get_setlist(setlist_id)
-        return [self.presets.get(i) for i in s.items] if s else []
+        return [self.presets.get(t.preset) for t in s.items] if s else []
+
+    def referenced_backgrounds(self) -> set[str]:
+        """Файлы фонов, на которые ссылаются треки (остальные можно удалить)."""
+        return {t.background for s in self.setlists for t in s.items if t.background}
 
 
 def touch_all(presets: Iterable[Preset]) -> None:

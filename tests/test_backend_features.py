@@ -381,3 +381,84 @@ def test_lfo_toggle_for_key(b):
     assert b.param("amp.bass").automated
     b.toggleLfoForKey("amp.bass")
     assert not b.param("amp.bass").automated
+
+
+# ---- данные трека сет-листа -----------------------------------------------------------
+
+def _image(tmp_path, name="bg.png", fmt="PNG"):
+    from PySide6.QtGui import QColor, QImage
+
+    img = QImage(64, 32, QImage.Format.Format_RGB32)
+    img.fill(QColor("#335577"))
+    path = tmp_path / "src" / name
+    path.parent.mkdir(exist_ok=True)
+    assert img.save(str(path), fmt)
+    return path
+
+
+def _setlist_with_tracks(b, n=2):
+    for i in range(n):
+        b.load_preset(Preset(f"Song {i + 1}", dict(default_values(), **{"amp.gain": i})))
+        b.saveCurrentAs(f"Song {i + 1}", "", "", False, "")
+        b.addToSetlist(b.currentPresetId)
+
+
+def test_track_chords_and_tuning_saved_with_setlist(b, tmp_path):
+    from thr10editor.model.library import Library
+
+    _setlist_with_tracks(b)
+    b.setTrackText(0, "chords", "Куплет: Am – F – C – G\nПрипев: F G Am")
+    b.setTrackText(0, "tuning", "  Drop D ")
+    b.setTrackText(1, "tuning", "Eb Standard")
+    items = b.setlistItems
+    assert items[0]["chords"].startswith("Куплет") and items[0]["tuning"] == "Drop D"
+    lib = Library(str(tmp_path / "library.json"))  # сохранено на диск вместе с сет-листом
+    t = lib.setlists[0].items
+    assert t[0].chords == "Куплет: Am – F – C – G\nПрипев: F G Am"
+    assert (t[0].tuning, t[1].tuning) == ("Drop D", "Eb Standard")
+    assert "Drop D" in b.tuningSuggestions and "Standard E" in b.tuningSuggestions
+
+
+def test_track_background_is_copied_replaced_and_removed(b, tmp_path):
+    _setlist_with_tracks(b)
+    src = _image(tmp_path)
+    assert b.setTrackBackground(0, str(src)) is True
+    bg_dir = tmp_path / "backgrounds"
+    files = list(bg_dir.iterdir())
+    assert len(files) == 1 and files[0].read_bytes() == src.read_bytes()
+    src.unlink()  # исходник удалён — фон остаётся
+    assert b.setlistItems[0]["hasBackground"] and b.setlistItems[0]["background"].startswith("file:")
+    # замена: старый файл удаляется
+    src2 = _image(tmp_path, "new.webp", "WEBP")
+    assert b.setTrackBackground(0, str(src2)) is True
+    files2 = list(bg_dir.iterdir())
+    assert len(files2) == 1 and files2[0].suffix == ".webp" and files2[0] != files[0]
+    b.clearTrackBackground(0)
+    assert not b.setlistItems[0]["hasBackground"] and list(bg_dir.iterdir()) == []
+
+
+def test_track_background_rejects_non_images(b, tmp_path):
+    _setlist_with_tracks(b, 1)
+    bad = tmp_path / "notes.txt"
+    bad.write_text("hello")
+    assert b.setTrackBackground(0, str(bad)) is False
+    fake = tmp_path / "fake.png"
+    fake.write_text("not an image")
+    assert b.setTrackBackground(0, str(fake)) is False
+    assert not b.setlistItems[0]["hasBackground"]
+
+
+def test_stage_shows_track_data(b, tmp_path):
+    _setlist_with_tracks(b, 3)
+    b.setTrackText(1, "chords", "C G Am F")
+    b.setTrackText(1, "tuning", "Drop C")
+    b.setTrackBackground(1, str(_image(tmp_path)))
+    b.startStage(0)
+    assert b.stageChords == "" and b.stageBackground == ""
+    b.stageNext()
+    assert (b.stageChords, b.stageTuning) == ("C G Am F", "Drop C")
+    assert b.stageBackground.startswith("file:")
+    b.startStage(2)
+    assert b.presetName == "Song 3"
+    b.deletePreset(b.setlistItems[1]["id"])  # трек с фоном удалён — файл тоже
+    assert list((tmp_path / "backgrounds").iterdir()) == []

@@ -9,14 +9,16 @@ from __future__ import annotations
 import logging
 import os
 import random
+import shutil
 import time
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
+from PySide6.QtGui import QImageReader
 
 from ..model.history import History, Step
-from ..model.library import Library
-from ..model.preset import Preset, normalize_folder, normalize_tags
+from ..model.library import BACKGROUND_EXTENSIONS, TUNING_SUGGESTIONS, Library
+from ..model.preset import Preset, new_id, normalize_folder, normalize_tags
 from ..model.state import Changes, Origin
 from ..model.tools import (
     CURVES,
@@ -462,6 +464,7 @@ class FullBackend(Backend):
             if self.current_preset_id == preset_id:
                 self.current_preset_id = ""
             self._lib_changed()
+            self._cleanup_backgrounds()
             self.toast.emit("info", f"Удалён «{p.name}»")
 
     @Slot(str)
@@ -624,17 +627,104 @@ class FullBackend(Backend):
         s = self.library.get_setlist(self.currentSetlistId)
         return s.name if s else ""
 
+    def _bg_dir(self) -> str:
+        d = os.path.join(self.data_dir, "backgrounds")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def _bg_url(self, name: str) -> str:
+        if not name:
+            return ""
+        path = os.path.join(self.data_dir, "backgrounds", name)
+        return QUrl.fromLocalFile(path).toString() if os.path.exists(path) else ""
+
+    def _cleanup_backgrounds(self) -> None:
+        """Удалить скопированные фоны, на которые больше не ссылается ни один трек."""
+        d = os.path.join(self.data_dir, "backgrounds")
+        if not os.path.isdir(d):
+            return
+        used = self.library.referenced_backgrounds()
+        for name in os.listdir(d):
+            if name not in used:
+                try:
+                    os.remove(os.path.join(d, name))
+                except OSError:
+                    log.warning("не удалось удалить фон %s", name)
+
+    def _track(self, index: int) -> Any:
+        s = self.library.get_setlist(self.currentSetlistId)
+        if s and 0 <= index < len(s.items):
+            return s.items[index]
+        return None
+
     @Property("QVariantList", notify=setlistChanged)
     def setlistItems(self) -> list[dict[str, Any]]:  # noqa: N802
         s = self.library.get_setlist(self.currentSetlistId)
         if not s:
             return []
         out = []
-        for i, pid in enumerate(s.items):
-            p = self.library.get(pid)
-            out.append({"index": i, "id": pid, "name": p.name if p else "(удалён)",
-                        "summary": summary(p.values) if p else "", "missing": p is None})
+        for i, t in enumerate(s.items):
+            p = self.library.get(t.preset)
+            out.append({"index": i, "id": t.preset, "name": p.name if p else "(удалён)",
+                        "summary": summary(p.values) if p else "", "missing": p is None,
+                        "chords": t.chords, "tuning": t.tuning,
+                        "background": self._bg_url(t.background),
+                        "hasBackground": bool(t.background)})
         return out
+
+    @Property("QStringList", constant=True)
+    def tuningSuggestions(self) -> list[str]:  # noqa: N802
+        return list(TUNING_SUGGESTIONS)
+
+    @Slot(int, str, str)
+    def setTrackText(self, index: int, field: str, text: str) -> None:  # noqa: N802
+        """Аккорды (chords) или строй (tuning) трека; сохраняется вместе с сет-листом."""
+        t = self._track(index)
+        if t is None or field not in ("chords", "tuning"):
+            return
+        text = text.strip() if field == "tuning" else text.rstrip()
+        if getattr(t, field) != text:
+            setattr(t, field, text)
+            self._save_library()
+            self.setlistChanged.emit()
+            self.stageChanged.emit()
+
+    @Slot(int, "QVariant", result=bool)
+    def setTrackBackground(self, index: int, url: Any) -> bool:  # noqa: N802
+        """Скопировать картинку в папку данных и назначить фоном трека."""
+        t = self._track(index)
+        if t is None:
+            return False
+        src = url_to_path(url)
+        ext = os.path.splitext(src)[1].lower()
+        if ext not in BACKGROUND_EXTENSIONS:
+            self.toast.emit("error", "Поддерживаются картинки PNG, JPG и WEBP")
+            return False
+        if QImageReader(src).size().isEmpty():
+            self.toast.emit("error", "Не удалось прочитать картинку")
+            return False
+        name = new_id() + (".jpg" if ext == ".jpeg" else ext)
+        try:
+            shutil.copyfile(src, os.path.join(self._bg_dir(), name))
+        except OSError as e:
+            self.toast.emit("error", f"Не удалось скопировать картинку: {e}")
+            return False
+        t.background = name
+        self._save_library()
+        self._cleanup_backgrounds()
+        self.setlistChanged.emit()
+        self.stageChanged.emit()
+        return True
+
+    @Slot(int)
+    def clearTrackBackground(self, index: int) -> None:  # noqa: N802
+        t = self._track(index)
+        if t is not None and t.background:
+            t.background = ""
+            self._save_library()
+            self._cleanup_backgrounds()
+            self.setlistChanged.emit()
+            self.stageChanged.emit()
 
     @Slot(str)
     def newSetlist(self, name: str) -> None:  # noqa: N802
@@ -653,6 +743,7 @@ class FullBackend(Backend):
     def deleteSetlist(self, sid: str) -> None:  # noqa: N802
         self.library.remove_setlist(sid)
         self._lib_changed()
+        self._cleanup_backgrounds()
 
     def _ensure_setlist(self):
         s = self.library.get_setlist(self.currentSetlistId)
@@ -666,7 +757,7 @@ class FullBackend(Backend):
         if not self.library.get(preset_id):
             return
         s = self._ensure_setlist()
-        s.items.append(preset_id)
+        s.add(preset_id)
         self._lib_changed()
         self.toast.emit("success", f"Добавлено в «{s.name}»")
 
@@ -683,6 +774,7 @@ class FullBackend(Backend):
         if s and 0 <= index < len(s.items):
             del s.items[index]
             self._lib_changed()
+            self._cleanup_backgrounds()
 
     @Slot(int, int)
     def moveSetlistItem(self, src: int, dst: int) -> None:  # noqa: N802
@@ -691,10 +783,10 @@ class FullBackend(Backend):
             s.items.insert(dst, s.items.pop(src))
             self._lib_changed()
 
-    def _stage_load(self, pid: str | None) -> None:
-        if pid is None:
+    def _stage_load(self, track: Any) -> None:
+        if track is None:
             return
-        p = self.library.get(pid)
+        p = self.library.get(track.preset)
         if p is not None:
             self.load_preset(p.copy())
         self.stageChanged.emit()
@@ -712,8 +804,8 @@ class FullBackend(Backend):
         return len(self.player.items)
 
     def _stage_name(self, offset: int) -> str:
-        pid = self.player.peek(offset)
-        p = self.library.get(pid) if pid else None
+        t = self.player.peek(offset)
+        p = self.library.get(t.preset) if t else None
         return p.name if p else ""
 
     @Property(str, notify=stageChanged)
@@ -728,16 +820,37 @@ class FullBackend(Backend):
     def stageSummary(self) -> str:  # noqa: N802
         return summary(self.state.values)
 
+    @Property(str, notify=stageChanged)
+    def stageChords(self) -> str:  # noqa: N802
+        t = self.player.current if self._stage else None
+        return t.chords if t else ""
+
+    @Property(str, notify=stageChanged)
+    def stageTuning(self) -> str:  # noqa: N802
+        t = self.player.current if self._stage else None
+        return t.tuning if t else ""
+
+    @Property(str, notify=stageChanged)
+    def stageBackground(self) -> str:  # noqa: N802
+        t = self.player.current if self._stage else None
+        return self._bg_url(t.background) if t else ""
+
     @Slot(int)
     def startStage(self, index: int) -> None:  # noqa: N802
         s = self.library.get_setlist(self.currentSetlistId)
-        items = [i for i in (s.items if s else []) if self.library.get(i)]
-        if not items:
+        tracks = list(s.items) if s else []
+        existing = [t for t in tracks if self.library.get(t.preset)]
+        if not existing:
             self.toast.emit("warning", "Сет-лист пуст — добавьте в него пресеты из библиотеки")
             return
-        self.player = SetlistPlayer(items)
+        # позиция выбранного трека среди существующих (удалённые пресеты пропускаются)
+        start = 0
+        if 0 <= index < len(tracks):
+            start = sum(1 for t in tracks[:index] if self.library.get(t.preset))
+            start = min(start, len(existing) - 1)
+        self.player = SetlistPlayer(existing)
         self._stage = True
-        self._stage_load(self.player.goto(max(0, index)))
+        self._stage_load(self.player.goto(start))
         self.stageChanged.emit()
 
     @Slot()
@@ -749,17 +862,17 @@ class FullBackend(Backend):
     def stageNext(self) -> None:  # noqa: N802
         if self._stage:
             before = self.player.index
-            pid = self.player.next()
+            t = self.player.next()
             if self.player.index != before:
-                self._stage_load(pid)
+                self._stage_load(t)
 
     @Slot()
     def stagePrev(self) -> None:  # noqa: N802
         if self._stage:
             before = self.player.index
-            pid = self.player.prev()
+            t = self.player.prev()
             if self.player.index != before:
-                self._stage_load(pid)
+                self._stage_load(t)
 
     @Slot(int)
     def stageGoto(self, index: int) -> None:  # noqa: N802

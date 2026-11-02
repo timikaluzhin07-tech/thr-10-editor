@@ -46,3 +46,12 @@ def test_midi_learn_can_be_cancelled(tmp_path):
     assert r["started"] == "next"
     assert r["after_esc"] == "" and r["after_click"] == "" and r["after_toggle"] == ""
     assert r["next_binding"] == "не задано"
+
+
+def test_stage_keyboard_and_track_data(tmp_path):
+    r = run_scenario("stage", tmp_path)
+    # пробел, пробел → 1, 2; ← ↑ → 1, 0; → ↓ PgDn → 1, 2, 3; PgUp → 2
+    assert r["indices"] == [1, 2, 1, 0, 1, 2, 3, 2]
+    assert r["chords_shown"] and r["tuning_shown"]
+    assert r["bg_fill_crop"] and r["bg_ready"]
+    assert r["active_after_esc"] is False

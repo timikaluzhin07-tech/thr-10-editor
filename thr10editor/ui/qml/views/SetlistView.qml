@@ -97,11 +97,20 @@ ColumnLayout {
                     }
                     Label {
                         Layout.fillWidth: true
-                        text: item.modelData.summary
+                        text: [item.modelData.summary,
+                               item.modelData.tuning,
+                               item.modelData.chords ? "аккорды" : "",
+                               item.modelData.hasBackground ? "фон" : ""].filter(x => x).join("  ·  ")
                         color: Theme.c.textMuted
                         font.pixelSize: Theme.fontSize.xs
                         elide: Text.ElideRight
                     }
+                }
+                IconButton {
+                    boxSize: Theme.size.control * 0.8
+                    iconName: "edit"; tip: "Строй, аккорды и фон для сцены"
+                    enabled: !item.modelData.missing
+                    onClicked: trackDialog.openFor(item.modelData.index)
                 }
                 IconButton {
                     boxSize: Theme.size.control * 0.8
@@ -216,4 +225,6 @@ ColumnLayout {
             }
         ]
     }
+
+    TrackDialog { id: trackDialog }
 }

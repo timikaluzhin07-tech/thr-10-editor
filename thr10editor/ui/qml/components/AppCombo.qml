@@ -15,7 +15,28 @@ ComboBox {
         width: root.popup.width - Theme.space.sm
         height: Theme.size.control
         highlighted: root.highlightedIndex === index
-        // TextField вместо Label: у редактируемого списка можно вводить текст
+        contentItem: Label {
+            text: typeof item.modelData === "string" ? item.modelData : (item.modelData[root.textRole] || "")
+            color: item.index === root.currentIndex ? Theme.c.accent : Theme.c.text
+            font.pixelSize: Theme.fontSize.md
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            radius: Theme.radius.sm
+            color: item.highlighted ? Theme.c.surface3 : "transparent"
+        }
+    }
+
+    indicator: Icon {
+        x: root.width - width - Theme.space.sm
+        y: (root.height - height) / 2
+        name: "chevron-down"
+        size: Theme.size.icon * 0.9
+        color: Theme.c.textMuted
+    }
+
+    // TextField вместо Label: у редактируемого списка можно вводить текст
     signal editingFinished()
     contentItem: TextField {
         leftPadding: Theme.space.md
@@ -35,30 +56,6 @@ ComboBox {
         verticalAlignment: Text.AlignVCenter
         background: null
         onEditingFinished: root.editingFinished()
-    }
-
-    background: Rectangle {
-            radius: Theme.radius.sm
-            color: item.highlighted ? Theme.c.surface3 : "transparent"
-        }
-    }
-
-    indicator: Icon {
-        x: root.width - width - Theme.space.sm
-        y: (root.height - height) / 2
-        name: "chevron-down"
-        size: Theme.size.icon * 0.9
-        color: Theme.c.textMuted
-    }
-
-    contentItem: Label {
-        leftPadding: Theme.space.md
-        rightPadding: Theme.size.icon + Theme.space.md
-        text: root.displayText
-        font: root.font
-        color: Theme.c.text
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
     }
 
     background: Rectangle {

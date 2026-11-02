@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from thr10editor.model.library import Library
+from thr10editor.model.library import Library, Setlist, SetlistTrack
 from thr10editor.model.preset import Preset
 from thr10editor.protocol.params import default_values
 
@@ -90,9 +90,10 @@ def test_crud(lib):
 def test_setlists_follow_deletions(lib):
     ids = list(lib.presets)
     s = lib.add_setlist("Гиг")
-    s.items = [ids[0], ids[1], ids[0]]
+    for i in (ids[0], ids[1], ids[0]):
+        s.add(i)
     lib.remove(ids[0])
-    assert s.items == [ids[1]]
+    assert s.preset_ids() == [ids[1]]
     assert [p.name for p in lib.setlist_presets(s.id)] == ["Lead Solo"]
     lib.remove_setlist(s.id)
     assert lib.setlists == []
@@ -108,7 +109,11 @@ def test_load_corrupt_file(tmp_path):
 
 def test_roundtrip_with_setlists(lib, tmp_path):
     s = lib.add_setlist("A")
-    s.items = list(lib.presets)[:2]
+    for i in list(lib.presets)[:2]:
+        s.add(i)
+    s.items[0].chords = "Am – F – C – G\nПрипев: F G Am"
+    s.items[0].tuning = "Drop D"
+    s.items[1].background = "abc.png"
     lib.save()
     again = Library(lib.path)
     assert [x.name for x in again.setlists] == ["A"]
@@ -121,3 +126,23 @@ def test_add_existing_id_copies(lib):
     p = next(iter(lib.presets.values()))
     q = lib.add(p)
     assert q.id != p.id and len(lib) == 5
+
+
+def test_setlist_old_format_is_read():
+    s = Setlist.from_dict({"name": "Old", "items": ["a", "", "b"]})
+    assert s.preset_ids() == ["a", "b"]
+    assert s.items[0] == SetlistTrack("a")
+
+
+def test_track_data_roundtrip_and_backgrounds(lib):
+    s = lib.add_setlist("Гиг")
+    pid = next(iter(lib.presets))
+    t = s.add(pid)
+    t.chords, t.tuning, t.background = "C G\nAm F", "Eb Standard", "x.webp"
+    lib.save()
+    again = Library(lib.path)
+    t2 = again.setlists[0].items[0]
+    assert (t2.chords, t2.tuning, t2.background) == ("C G\nAm F", "Eb Standard", "x.webp")
+    assert again.referenced_backgrounds() == {"x.webp"}
+    again.remove(pid)  # трек удалённого пресета исчезает вместе с фоном
+    assert again.referenced_backgrounds() == set()
