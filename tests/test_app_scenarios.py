@@ -39,3 +39,10 @@ def test_multi_key_shortcuts_work(tmp_path):
     r = run_scenario("hotkeys", tmp_path)
     assert r["nested"] == []
     assert r["after_space"] == "B" and r["after_b"] == "A"
+
+
+def test_midi_learn_can_be_cancelled(tmp_path):
+    r = run_scenario("learn", tmp_path)
+    assert r["started"] == "next"
+    assert r["after_esc"] == "" and r["after_click"] == "" and r["after_toggle"] == ""
+    assert r["next_binding"] == "не задано"

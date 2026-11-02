@@ -93,7 +93,12 @@ class ControllerMapper:
         self._held: set[tuple[str, int, int]] = set()
 
     def learn(self, which: str) -> None:
-        self.learning = which
+        """Начать ожидание события для «next»/«prev». Повторный вызов для того же —
+        отмена (прежняя привязка не меняется)."""
+        self.learning = None if self.learning == which else which
+
+    def cancel_learn(self) -> None:
+        self.learning = None
 
     def handle(self, e: ControlEvent) -> tuple[str, Any] | None:
         # Педаль CC шлёт 127 при нажатии и 0 при отпускании — реагируем на фронт.

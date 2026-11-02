@@ -77,6 +77,24 @@ def scenario_hotkeys(app, backend, window):
     result["after_b"] = backend.abActive
 
 
+def scenario_learn(app, backend, window):
+    res = {}
+    backend.learnController("next")
+    res["started"] = backend.controllerLearning
+    key(window, Qt.Key.Key_Escape)
+    res["after_esc"] = backend.controllerLearning
+    backend.learnController("prev")
+    QTest.mouseClick(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                     QPoint(700, 500))
+    QTest.qWait(30)
+    res["after_click"] = backend.controllerLearning
+    backend.learnController("next")
+    backend.learnController("next")
+    res["after_toggle"] = backend.controllerLearning
+    res["next_binding"] = backend.nextBinding
+    result.update(res)
+
+
 def run(app, backend, theme, window, seconds, screenshot, warnings, exit_code):
     def go():
         try:

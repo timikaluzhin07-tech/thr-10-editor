@@ -163,7 +163,7 @@ ColumnLayout {
                     checked: Backend.controllerLearning === "next"
                     onClicked: Backend.learnController("next")
                 }
-                Label { text: Backend.nextBinding; color: Theme.c.textMuted; font.pixelSize: Theme.fontSize.xs; elide: Text.ElideRight; Layout.fillWidth: true }
+                Label { text: Backend.controllerLearning === "next" ? "Esc или клик — отмена" : Backend.nextBinding; color: Backend.controllerLearning === "next" ? Theme.c.accent : Theme.c.textMuted; font.pixelSize: Theme.fontSize.xs; elide: Text.ElideRight; Layout.fillWidth: true }
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -173,7 +173,7 @@ ColumnLayout {
                     checked: Backend.controllerLearning === "prev"
                     onClicked: Backend.learnController("prev")
                 }
-                Label { text: Backend.prevBinding; color: Theme.c.textMuted; font.pixelSize: Theme.fontSize.xs; elide: Text.ElideRight; Layout.fillWidth: true }
+                Label { text: Backend.controllerLearning === "prev" ? "Esc или клик — отмена" : Backend.prevBinding; color: Backend.controllerLearning === "prev" ? Theme.c.accent : Theme.c.textMuted; font.pixelSize: Theme.fontSize.xs; elide: Text.ElideRight; Layout.fillWidth: true }
             }
             RowLayout {
                 spacing: Theme.space.sm

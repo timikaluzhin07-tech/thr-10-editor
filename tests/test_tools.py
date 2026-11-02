@@ -312,3 +312,17 @@ def test_controller_program_change_select():
     m.next = b
     assert m.handle(ControlEvent("pc", 0, 9)) == ("next", None)
     assert Binding.from_dict({"kind": "zzz"}) is None
+
+
+def test_controller_learn_cancel_keeps_binding():
+    m = ControllerMapper(next_binding=Binding("cc", 0, 10))
+    m.learn("next")
+    assert m.learning == "next"
+    m.learn("next")  # повторное нажатие той же кнопки — отмена
+    assert m.learning is None and m.next == Binding("cc", 0, 10)
+    m.learn("prev")
+    m.cancel_learn()  # Esc / клик мимо
+    assert m.learning is None and m.prev is None
+    # после отмены события не переназначают привязку
+    assert m.handle(ControlEvent("cc", 0, 99, 127)) is None
+    assert m.next == Binding("cc", 0, 10)

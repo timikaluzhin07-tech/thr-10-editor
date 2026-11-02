@@ -830,8 +830,16 @@ class FullBackend(Backend):
 
     @Slot(str)
     def learnController(self, which: str) -> None:  # noqa: N802
+        """Начать ожидание педали; повторное нажатие той же кнопки — отмена."""
         self.mapper.learn(which)
         self.controllerChanged.emit()
+
+    @Slot()
+    def cancelControllerLearn(self) -> None:  # noqa: N802
+        """Отменить ожидание (Esc, клик мимо). Привязки не меняются."""
+        if self.mapper.learning:
+            self.mapper.cancel_learn()
+            self.controllerChanged.emit()
 
     @Property(str, notify=controllerChanged)
     def controllerLearning(self) -> str:  # noqa: N802

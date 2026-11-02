@@ -81,6 +81,7 @@ ApplicationWindow {
         { group: "Библиотека", seq: "Ctrl+S", text: "Сохранить как новый пресет (существующие не перезаписываются)", act: () => win.save(), when: () => win.inEditor },
         { group: "Библиотека", seq: "Ctrl+F", text: "Поиск в библиотеке", act: () => win.focusSearch(), when: () => win.inEditor },
         { group: "Вид", seq: "Ctrl+T", text: "Панель инструментов", act: () => win.toolsVisible = !win.toolsVisible },
+        { group: "MIDI-контроллер", seq: "Esc", text: "Отменить ожидание педали/клавиши контроллера", act: () => Backend.cancelControllerLearn(), when: () => Backend.controllerLearning !== "" && !Backend.stageActive },
         { group: "Сцена", seq: "F5", text: "Режим «Сцена» для текущего сет-листа", act: () => win.startStage(0), when: () => win.inEditor },
         { group: "Сцена", seq: ["Right", "Down", "PgDown", "Space"], label: ["→", "↓", "PgDn", "Пробел"], text: "Следующий пресет", act: () => Backend.stageNext(), when: () => Backend.stageActive },
         { group: "Сцена", seq: ["Left", "Up", "PgUp", "Backspace"], label: ["←", "↑", "PgUp"], text: "Предыдущий пресет", act: () => Backend.stagePrev(), when: () => Backend.stageActive },
@@ -377,6 +378,18 @@ ApplicationWindow {
     StageView {
         anchors.fill: parent
         z: 500
+    }
+
+    // Ожидание педали MIDI-контроллера: клик в любом месте окна (включая ту же
+    // кнопку) отменяет ожидание; прежнее назначение не меняется.
+    MouseArea {
+        parent: Overlay.overlay
+        anchors.fill: parent
+        z: 10000
+        visible: Backend.controllerLearning !== ""
+        acceptedButtons: Qt.AllButtons
+        onPressed: Backend.cancelControllerLearn()
+        onWheel: (w) => w.accepted = true
     }
 
     Toasts {
