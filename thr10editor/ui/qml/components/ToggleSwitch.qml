@@ -5,7 +5,7 @@ import THR10
 // Переключатель вкл/выкл (настройки, опции): сдержанная дорожка, объёмный бегунок.
 AbstractButton {
     id: root
-    property color accent: Theme.c.accent
+    property color accent: Theme.c.accentFill
     checkable: true
     focusPolicy: Qt.StrongFocus
     implicitWidth: Theme.size.control * 1.1

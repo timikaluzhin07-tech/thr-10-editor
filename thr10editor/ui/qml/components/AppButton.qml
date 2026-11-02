@@ -23,7 +23,7 @@ Button {
 
     readonly property bool primary: variant === "primary"
     readonly property color fg: !enabled ? Theme.c.textFaint
-                               : primary ? Theme.c.accentText
+                               : primary ? Theme.c.accentFillText
                                : variant === "danger" ? Theme.c.danger
                                : checked ? Theme.c.accent
                                : Theme.c.text
@@ -36,20 +36,20 @@ Button {
         radius: Theme.radius.md
         opacity: root.enabled ? 1 : 0.55
         border.width: root.variant === "ghost" ? 0 : 1
-        border.color: root.primary ? Qt.darker(Theme.c.accent, 1.25)
+        border.color: root.primary ? Qt.darker(Theme.c.accentFill, 1.25)
                     : root.checked ? Theme.c.accent
                     : root.variant === "danger" ? Theme.c.danger
                     : root.hovered ? Theme.c.borderStrong : Theme.c.border
         gradient: Gradient {
             GradientStop {
                 position: 0.0
-                color: root.primary ? (root.hovered ? Theme.c.accentHover : Theme.c.accent)
+                color: root.primary ? (root.hovered ? Theme.c.accentFillHover : Theme.c.accentFill)
                      : root.variant === "ghost" ? (root.down ? Theme.c.surface3 : root.hovered ? Theme.c.surface2 : "transparent")
                      : (root.down ? Theme.c.surface2 : Theme.c.surface3)
             }
             GradientStop {
                 position: 1.0
-                color: root.primary ? Qt.darker(root.hovered ? Theme.c.accentHover : Theme.c.accent, 1.12)
+                color: root.primary ? Qt.darker(root.hovered ? Theme.c.accentFillHover : Theme.c.accentFill, 1.06)
                      : root.variant === "ghost" ? (root.down ? Theme.c.surface3 : root.hovered ? Theme.c.surface2 : "transparent")
                      : (root.down ? Theme.c.surface2 : root.hovered ? Theme.c.surface3 : Theme.c.surface2)
             }

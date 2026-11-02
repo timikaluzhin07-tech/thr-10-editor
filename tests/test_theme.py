@@ -80,3 +80,23 @@ def test_theme_provider_qt():
     assert seen.count("c") == 1 and seen.count("m") >= 2
     assert t.alpha("accent", 0.5).alphaF() == pytest.approx(0.5, abs=0.01)
     del app
+
+
+@pytest.mark.parametrize("mode", list(THEMES))
+def test_filled_accent_buttons_readable(mode):
+    """Текст на оранжевых (залитых) кнопках — не ниже 4,5:1 (WCAG AA)."""
+    c = THEMES[mode]
+    assert contrast(c["accentFillText"], c["accentFill"]) >= 4.5
+    assert contrast(c["accentFillText"], c["accentFillHover"]) >= 4.5
+
+
+def test_light_fill_is_lighter_and_dark_theme_unchanged():
+    from thr10editor.ui.theme import luminance
+
+    light, dark = THEMES["light"], THEMES["dark"]
+    # светлая тема: заливка кнопок заметно светлее прежнего #A0590E и светлее акцента-текста
+    assert luminance(light["accentFill"]) > luminance("#A0590E") * 2
+    assert luminance(light["accent"]) > luminance("#A0590E")
+    # тёмная тема: залитые кнопки выглядят как раньше
+    assert (dark["accentFill"], dark["accentFillHover"], dark["accentFillText"]) == (
+        dark["accent"], dark["accentHover"], dark["accentText"]) == ("#E9A23B", "#F2B35A", "#1A1206")
