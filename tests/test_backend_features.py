@@ -121,15 +121,11 @@ def test_ab_switch_sends_single_dump(b):
 
 # ---- библиотека -------------------------------------------------------------------------
 
-def test_library_save_update_and_search(b, tmp_path):
+def test_library_save_and_search(b, tmp_path):
     b.presetName = "Blues"
     b.saveCurrentAs("Blues", "Live", "blues, clean", True, "")
     pid = b.currentPresetId
     assert pid and b.libraryTotal == 1 and not b.dirty
-    b.param("amp.gain").setValue(3)
-    assert b.dirty
-    assert b.saveCurrent() is True
-    assert b.library.get(pid).values["amp.gain"] == 3
     b.libSearch = "blu"
     assert b.libraryCount == 1
     b.libSearch = "metal"
@@ -145,8 +141,77 @@ def test_library_save_update_and_search(b, tmp_path):
     assert len(Library(str(tmp_path / "library.json"))) == 1
 
 
-def test_save_current_without_library_preset_returns_false(b):
-    assert b.saveCurrent() is False
+def _custom_sound(b):
+    """Звук, далёкий от значений по умолчанию, включая неактивные варианты."""
+    import random
+
+    from thr10editor.protocol.params import PARAMS
+
+    rng = random.Random(11)
+    vals = {k: rng.randint(p.minimum, p.maximum) for k, p in PARAMS.items()}
+    vals.update({"amp.gain": 3, "delay.on": 1, "reverb.type": 3, "mod.type": 1,
+                 "mod.chorus.speed": 99})
+    b.load_preset(Preset("Custom", vals))
+    b.param("amp.treble").setValue(7)  # правка после загрузки
+    return b.state.values
+
+
+def test_save_always_creates_new_preset_with_actual_values(b):
+    sound = _custom_sound(b)
+    b.saveCurrentAs("First", "", "", False, "")
+    first = b.currentPresetId
+    # дальнейшая правка и повторное «Сохранить» — новый пресет, старый не тронут
+    b.param("amp.bass").setValue(1)
+    sound2 = b.state.values
+    b.saveCurrentAs("Second", "", "", False, "")
+    second = b.currentPresetId
+    assert first != second and b.libraryTotal == 2
+    assert b.library.get(first).values == sound          # ровно то, что звучало
+    assert b.library.get(second).values == sound2
+    assert b.library.get(first).values["amp.bass"] != 1  # первый не перезаписан
+    # звук в редакторе не изменился ни на один параметр, новый пресет активен
+    assert b.state.values == sound2
+    assert b.currentPresetId == second and not b.dirty
+    assert b.library.get(second).values != b.library.get(first).values
+
+
+def test_save_same_name_does_not_overwrite(b):
+    _custom_sound(b)
+    b.saveCurrentAs("Same", "", "", False, "")
+    a = b.currentPresetId
+    b.param("amp.middle").setValue(2)
+    b.saveCurrentAs("Same", "", "", False, "")
+    assert b.libraryTotal == 2 and b.currentPresetId != a
+    assert b.library.get(a).values["amp.middle"] != 2
+
+
+def test_overwrite_is_explicit(b):
+    _custom_sound(b)
+    b.saveCurrentAs("Target", "Live", "x", False, "n")
+    target = b.currentPresetId
+    b.saveCurrentAs("Other", "", "", False, "")
+    other = b.currentPresetId
+    other_vals = b.library.get(other).values
+    b.param("amp.gain").setValue(88)
+    assert b.overwritePreset(target) is True
+    t = b.library.get(target)
+    assert t.values == b.state.values and t.values["amp.gain"] == 88
+    assert (t.name, t.folder, t.tags, t.notes) == ("Target", "Live", ["x"], "n")
+    assert b.library.get(other).values == other_vals
+    assert b.currentPresetId == target and b.presetName == "Target"
+    assert b.overwritePreset("nope") is False
+
+
+def test_add_current_to_setlist_never_overwrites(b):
+    _custom_sound(b)
+    b.saveCurrentAs("Song", "", "", False, "")
+    pid = b.currentPresetId
+    saved = b.library.get(pid).values
+    b.param("amp.gain").setValue(77)  # изменили звук
+    b.addCurrentToSetlist()
+    assert b.library.get(pid).values == saved
+    assert b.libraryTotal == 2
+    assert b.setlistItems[-1]["id"] == b.currentPresetId != pid
 
 
 def test_import_files_to_library(b, tmp_path):

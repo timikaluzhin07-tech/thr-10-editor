@@ -192,6 +192,7 @@ ColumnLayout {
         MenuItem { text: "Добавить в сет-лист"; onTriggered: Backend.addToSetlist(menu.presetId) }
         MenuItem { text: "Морфинг к этому пресету"; onTriggered: Backend.morphTo(menu.presetId) }
         MenuSeparator {}
+        MenuItem { text: "Перезаписать текущим звуком…"; onTriggered: overwriteDialog.openFor(menu.presetId) }
         MenuItem { text: "Удалить"; onTriggered: Backend.deletePreset(menu.presetId) }
     }
 
@@ -202,7 +203,7 @@ ColumnLayout {
             Layout.fillWidth: true
             text: "Сохранить звук"
             iconName: "save"
-            tip: "Ctrl+S — обновить пресет / Ctrl+Shift+S — сохранить как новый"
+            tip: "Сохранить текущий звук как новый пресет (Ctrl+S). Существующие пресеты не перезаписываются"
             onClicked: root.saveRequested()
         }
         IconButton { iconName: "import"; tip: "Импорт файлов в библиотеку (.YDL, .syx, .thrpreset)"; onClicked: importFiles.open() }
@@ -245,6 +246,36 @@ ColumnLayout {
                     else Backend.newFolder(folderName.text)
                     folderDialog.close()
                 }
+            }
+        ]
+    }
+
+    AppDialog {
+        id: overwriteDialog
+        property string presetId: ""
+        property string presetName: ""
+        title: "Перезаписать пресет?"
+        maxWidth: Theme.space.xxxl * 9
+        function openFor(id) {
+            const info = Backend.presetInfo(id)
+            if (!info.id) return
+            presetId = id
+            presetName = info.name
+            open()
+        }
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: Theme.c.text
+            text: "Значения пресета «" + overwriteDialog.presetName + "» будут заменены текущим звуком редактора. Имя, папка и теги останутся. Это действие нельзя отменить."
+        }
+        footer: [
+            Item { Layout.fillWidth: true },
+            AppButton { text: "Отмена"; onClicked: overwriteDialog.close() },
+            AppButton {
+                variant: "danger"
+                text: "Перезаписать"
+                onClicked: { Backend.overwritePreset(overwriteDialog.presetId); overwriteDialog.close() }
             }
         ]
     }

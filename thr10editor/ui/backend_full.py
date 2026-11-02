@@ -397,33 +397,46 @@ class FullBackend(Backend):
             return
         self.load_preset(p.copy())
 
-    @Slot(result=bool)
-    def saveCurrent(self) -> bool:  # noqa: N802
-        """Ctrl+S: обновить пресет библиотеки, если звук из неё, иначе — False (нужен диалог)."""
-        p = self.library.get(self.current_preset_id)
+    @Slot(str, result=bool)
+    def overwritePreset(self, preset_id: str) -> bool:  # noqa: N802
+        """Явная перезапись пресета библиотеки текущим звуком (после подтверждения в UI).
+
+        Имя, папка, теги и заметки пресета сохраняются; меняются только значения.
+        """
+        p = self.library.get(preset_id)
         if p is None:
+            self.toast.emit("error", "Пресет не найден")
             return False
-        p.name = self.state.name
-        p.values = self.state.values
+        p.values = dict(self.state.values)
         self.library.update(p)
+        self.current_preset_id = p.id
+        if self.state.name != p.name:
+            self.presetName = p.name
         self._mark_clean()
         self._lib_changed()
-        self.toast.emit("success", f"Сохранено: «{p.name}»")
+        self.toast.emit("success", f"Перезаписан «{p.name}»")
         return True
 
     @Slot(str, str, str, bool, str)
     def saveCurrentAs(self, name: str, folder: str, tags: str, favorite: bool,  # noqa: N802
                       notes: str) -> None:
+        """«Сохранить»: всегда новый пресет из текущих фактических значений.
+
+        Существующие пресеты не перезаписываются; звук в редакторе не меняется
+        (меняется только имя, если его ввели в диалоге). Новый пресет становится
+        активным.
+        """
+        values = dict(self.state.values)  # снимок того, что звучит сейчас
         name = name.strip() or self.state.name
-        p = Preset(name, self.state.values, folder=folder, tags=normalize_tags(tags),
+        p = Preset(name, values, folder=folder, tags=normalize_tags(tags),
                    favorite=favorite, notes=notes, source="редактор")
-        self.library.add(p)
+        p = self.library.add(p)
         if name != self.state.name:
             self.presetName = name
         self.current_preset_id = p.id
         self._mark_clean()
         self._lib_changed()
-        self.toast.emit("success", f"Добавлено в библиотеку: «{p.name}»")
+        self.toast.emit("success", f"Сохранён новый пресет «{p.name}»")
 
     @Slot(str, str, str, str, bool, str)
     def updatePresetMeta(self, preset_id: str, name: str, folder: str, tags: str,  # noqa: N802
@@ -659,10 +672,9 @@ class FullBackend(Backend):
 
     @Slot()
     def addCurrentToSetlist(self) -> None:  # noqa: N802
-        if not self.library.get(self.current_preset_id):
+        # звук ещё не в библиотеке или изменён — сохраняем как новый, ничего не перезаписывая
+        if not self.library.get(self.current_preset_id) or self.dirty:
             self.saveCurrentAs(self.state.name, "Сет-листы", "", False, "")
-        elif self.dirty:
-            self.saveCurrent()
         self.addToSetlist(self.current_preset_id)
 
     @Slot(int)

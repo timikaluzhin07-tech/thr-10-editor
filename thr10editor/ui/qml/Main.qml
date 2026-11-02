@@ -78,8 +78,7 @@ ApplicationWindow {
         { group: "Звук", seq: "Ctrl+Shift+R", text: "Случайный звук (рандомайзер)", act: () => Backend.randomize(), when: () => win.editing },
         { group: "Звук", seq: "Ctrl+M", text: "Морфинг: старт / стоп", act: () => Backend.morphRunning ? Backend.stopMorph() : Backend.startMorph() },
         { group: "Звук", seq: "Ctrl+L", text: "Автоматизация (LFO): старт / стоп", act: () => Backend.toggleAutomation() },
-        { group: "Библиотека", seq: "Ctrl+S", text: "Сохранить (обновить пресет или добавить в библиотеку)", act: () => win.save(), when: () => win.editing },
-        { group: "Библиотека", seq: "Ctrl+Shift+S", text: "Сохранить как новый пресет", act: () => presetDialog.openNew(), when: () => win.editing },
+        { group: "Библиотека", seq: "Ctrl+S", text: "Сохранить как новый пресет (существующие не перезаписываются)", act: () => win.save(), when: () => win.editing },
         { group: "Библиотека", seq: "Ctrl+F", text: "Поиск в библиотеке", act: () => win.focusSearch(), when: () => win.editing },
         { group: "Вид", seq: "Ctrl+T", text: "Панель инструментов", act: () => win.toolsVisible = !win.toolsVisible },
         { group: "Сцена", seq: "F5", text: "Режим «Сцена» для текущего сет-листа", act: () => win.startStage(0), when: () => win.editing },
@@ -90,8 +89,7 @@ ApplicationWindow {
     readonly property var allShortcuts: shortcutList.concat(extraShortcuts)
 
     function save() {
-        if (!Backend.saveCurrent())
-            presetDialog.openNew()
+        presetDialog.openNew()
     }
     signal searchRequested()
     function focusSearch() {
