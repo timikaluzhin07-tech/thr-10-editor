@@ -85,6 +85,10 @@ def main(argv: list[str] | None = None) -> int:
 
     qmlRegisterSingletonInstance(type(theme), "THR10", 1, 0, "Theme", theme)
     qmlRegisterSingletonInstance(type(backend), "THR10", 1, 0, "Backend", backend)
+    from .text_input import TextInputGuard
+
+    input_guard = TextInputGuard()
+    qmlRegisterSingletonInstance(TextInputGuard, "THR10", 1, 0, "InputGuard", input_guard)
 
     engine = QQmlApplicationEngine()
     engine.addImportPath(QML_DIR)
@@ -96,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(warnings), file=sys.stderr)
         return 1
     window = engine.rootObjects()[0]
+    input_guard.attach(window)
     if args.size:
         try:
             w, h = (int(x) for x in args.size.lower().split("x"))

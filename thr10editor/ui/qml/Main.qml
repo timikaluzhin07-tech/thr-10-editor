@@ -68,20 +68,20 @@ ApplicationWindow {
         { group: "Ручка (в фокусе)", seq: "", label: ["Del"], text: "Значение по умолчанию (или двойной клик)" },
         { group: "Ручка (в фокусе)", seq: "", label: ["Enter"], text: "Ввести значение с клавиатуры" },
     ]
-    readonly property bool editing: !Backend.stageActive
+    readonly property bool inEditor: !Backend.stageActive
     property var extraShortcuts: [
-        { group: "Звук", seq: "Ctrl+Z", text: "Отменить", act: () => Backend.undo(), when: () => win.editing },
-        { group: "Звук", seq: ["Ctrl+Y", "Ctrl+Shift+Z"], label: ["Ctrl+Y", "Ctrl+Shift+Z"], text: "Повторить", act: () => Backend.redo(), when: () => win.editing },
-        { group: "Звук", seq: ["Space", "B"], label: ["Пробел", "B"], text: "A/B: переключить слот", act: () => Backend.toggleAB(), when: () => win.editing },
-        { group: "Звук", seq: "Ctrl+Shift+C", text: "A/B: копировать текущий звук в другой слот", act: () => Backend.copyToOtherSlot(), when: () => win.editing },
+        { group: "Звук", seq: "Ctrl+Z", text: "Отменить", act: () => Backend.undo(), when: () => win.inEditor },
+        { group: "Звук", seq: ["Ctrl+Y", "Ctrl+Shift+Z"], label: ["Ctrl+Y", "Ctrl+Shift+Z"], text: "Повторить", act: () => Backend.redo(), when: () => win.inEditor },
+        { group: "Звук", seq: ["Space", "B"], label: ["Пробел", "B"], text: "A/B: переключить слот", act: () => Backend.toggleAB(), when: () => win.inEditor },
+        { group: "Звук", seq: "Ctrl+Shift+C", text: "A/B: копировать текущий звук в другой слот", act: () => Backend.copyToOtherSlot(), when: () => win.inEditor },
         { group: "Звук", seq: "T", text: "Тап-темп дилея", act: () => Backend.tapTempo() },
-        { group: "Звук", seq: "Ctrl+Shift+R", text: "Случайный звук (рандомайзер)", act: () => Backend.randomize(), when: () => win.editing },
+        { group: "Звук", seq: "Ctrl+Shift+R", text: "Случайный звук (рандомайзер)", act: () => Backend.randomize(), when: () => win.inEditor },
         { group: "Звук", seq: "Ctrl+M", text: "Морфинг: старт / стоп", act: () => Backend.morphRunning ? Backend.stopMorph() : Backend.startMorph() },
         { group: "Звук", seq: "Ctrl+L", text: "Автоматизация (LFO): старт / стоп", act: () => Backend.toggleAutomation() },
-        { group: "Библиотека", seq: "Ctrl+S", text: "Сохранить как новый пресет (существующие не перезаписываются)", act: () => win.save(), when: () => win.editing },
-        { group: "Библиотека", seq: "Ctrl+F", text: "Поиск в библиотеке", act: () => win.focusSearch(), when: () => win.editing },
+        { group: "Библиотека", seq: "Ctrl+S", text: "Сохранить как новый пресет (существующие не перезаписываются)", act: () => win.save(), when: () => win.inEditor },
+        { group: "Библиотека", seq: "Ctrl+F", text: "Поиск в библиотеке", act: () => win.focusSearch(), when: () => win.inEditor },
         { group: "Вид", seq: "Ctrl+T", text: "Панель инструментов", act: () => win.toolsVisible = !win.toolsVisible },
-        { group: "Сцена", seq: "F5", text: "Режим «Сцена» для текущего сет-листа", act: () => win.startStage(0), when: () => win.editing },
+        { group: "Сцена", seq: "F5", text: "Режим «Сцена» для текущего сет-листа", act: () => win.startStage(0), when: () => win.inEditor },
         { group: "Сцена", seq: ["Right", "Down", "PgDown", "Space"], label: ["→", "↓", "PgDn", "Пробел"], text: "Следующий пресет", act: () => Backend.stageNext(), when: () => Backend.stageActive },
         { group: "Сцена", seq: ["Left", "Up", "PgUp", "Backspace"], label: ["←", "↑", "PgUp"], text: "Предыдущий пресет", act: () => Backend.stagePrev(), when: () => Backend.stageActive },
         { group: "Сцена", seq: "Esc", text: "Выйти из режима «Сцена»", act: () => win.stopStage(), when: () => Backend.stageActive },
@@ -126,8 +126,13 @@ ApplicationWindow {
         model: win.allShortcuts
         delegate: Shortcut {
             required property var modelData
-            sequences: modelData.seq ? (Array.isArray(modelData.seq) ? modelData.seq : [modelData.seq]) : []
-            enabled: modelData.seq !== "" && modelData.act !== undefined && (modelData.when === undefined || modelData.when())
+            // seq — строка или список; список из property var не проходит Array.isArray,
+            // поэтому проверяем именно строку (иначе получался вложенный список и
+            // сочетание молча не работало)
+            sequences: !modelData.seq ? [] : (typeof modelData.seq === "string" ? [modelData.seq] : modelData.seq)
+            // пока в фокусе текстовое поле, горячие клавиши не работают (InputGuard)
+            enabled: modelData.seq !== "" && modelData.act !== undefined && !InputGuard.editing
+                     && (modelData.when === undefined || modelData.when())
             context: Qt.ApplicationShortcut
             onActivated: modelData.act()
         }

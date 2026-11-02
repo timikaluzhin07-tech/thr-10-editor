@@ -79,6 +79,7 @@ Rectangle {
             }
             TextField {
                 id: nameField
+                objectName: "presetNameField"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
@@ -165,7 +166,7 @@ Rectangle {
             onClicked: Backend.copyToOtherSlot()
         }
 
-        Item { Layout.fillWidth: true }
+        Item { objectName: "topBarSpacer"; Layout.fillWidth: true; Layout.fillHeight: true }
 
         IconButton {
             iconName: "stage"

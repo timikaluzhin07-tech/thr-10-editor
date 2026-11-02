@@ -15,14 +15,29 @@ ComboBox {
         width: root.popup.width - Theme.space.sm
         height: Theme.size.control
         highlighted: root.highlightedIndex === index
-        contentItem: Label {
-            text: typeof item.modelData === "string" ? item.modelData : (item.modelData[root.textRole] || "")
-            color: item.index === root.currentIndex ? Theme.c.accent : Theme.c.text
-            font.pixelSize: Theme.fontSize.md
-            elide: Text.ElideRight
-            verticalAlignment: Text.AlignVCenter
-        }
-        background: Rectangle {
+        // TextField вместо Label: у редактируемого списка можно вводить текст
+    signal editingFinished()
+    contentItem: TextField {
+        leftPadding: Theme.space.md
+        rightPadding: Theme.size.icon + Theme.space.md
+        topPadding: 0
+        bottomPadding: 0
+        text: root.editable ? root.editText : root.displayText
+        enabled: root.editable
+        autoScroll: root.editable
+        readOnly: root.down
+        inputMethodHints: root.inputMethodHints
+        validator: root.validator
+        selectByMouse: root.selectTextByMouse
+        font: root.font
+        color: Theme.c.text
+        selectionColor: Theme.c.selection
+        verticalAlignment: Text.AlignVCenter
+        background: null
+        onEditingFinished: root.editingFinished()
+    }
+
+    background: Rectangle {
             radius: Theme.radius.sm
             color: item.highlighted ? Theme.c.surface3 : "transparent"
         }

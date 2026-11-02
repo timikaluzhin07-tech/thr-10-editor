@@ -387,6 +387,7 @@ FocusScope {
                     border.color: editor.bad ? Theme.c.danger : Theme.c.accent
                 }
                 property bool bad: false
+                property bool finishOnEnter: false  // при ошибке ввод остаётся открытым
                 onAccepted: {
                     if (root.param && root.param.setFromText(text)) {
                         visible = false
@@ -396,7 +397,14 @@ FocusScope {
                     }
                 }
                 onTextEdited: bad = false
-                onActiveFocusChanged: if (!activeFocus) visible = false
+                // клик вне поля завершает ввод и применяет значение (общий механизм InputGuard)
+                onActiveFocusChanged: {
+                    if (!activeFocus) {
+                        if (visible && root.param && text !== root.param.text)
+                            root.param.setFromText(text)
+                        visible = false
+                    }
+                }
                 Keys.onEscapePressed: { visible = false; root.forceActiveFocus() }
             }
         }
