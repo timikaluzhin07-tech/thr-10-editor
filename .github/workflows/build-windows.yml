@@ -1,0 +1,85 @@
+# Сборка THR10Editor.exe и THR10Probe.exe на Windows и публикация в Releases.
+name: Сборка для Windows
+
+on:
+  push:
+    branches: ["main", "master", "claude/**"]
+    paths-ignore: ["docs/**", "*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Зависимости
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Тесты
+        run: python -m pytest
+
+      - name: Сборка и самопроверка .exe
+        run: python scripts/build_exe.py
+
+      - name: Проверка THR10Probe.exe на демо-комбике
+        run: |
+          .\dist\THR10Probe.exe --demo --log probe_ci.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Архив сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: THR10Editor-windows
+          path: |
+            dist/THR10Editor.exe
+            dist/THR10Probe.exe
+
+      - name: Публикация в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $version = python -c "import thr10editor; print(thr10editor.__version__)"
+          $tag = "v$version"
+          $sha = "${{ github.sha }}".Substring(0, 7)
+          $notes = @"
+          THR10 Editor $version (сборка $sha, ветка ${{ github.ref_name }}).
+
+          * **THR10Editor.exe** — редактор, запускается без установки.
+          * **THR10Probe.exe** — проверка связи с комбиком (консольная), лог пишет рядом с собой.
+
+          Перед запуском закройте официальный THR Editor. Windows может показать
+          «Windows защитила ваш компьютер» (программа без цифровой подписи):
+          «Подробнее» → «Выполнить в любом случае».
+
+          На реальном комбике пока не проверено — чек-лист: docs/HARDWARE_TEST.md.
+          "@
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target "${{ github.sha }}" --title "THR10 Editor $version" --notes $notes
+          } else {
+            gh release edit $tag --notes $notes
+          }
+          gh release upload $tag dist/THR10Editor.exe dist/THR10Probe.exe --clobber

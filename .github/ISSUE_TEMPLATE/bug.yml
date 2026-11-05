@@ -1,0 +1,36 @@
+name: Ошибка
+description: Что-то работает не так
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Версия программы
+      description: Видна в Настройках или в имени релиза
+      placeholder: "1.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Режим
+      options: [С комбиком, Демо-режим]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Что сделали, что ожидали, что получилось
+      placeholder: |
+        1. …
+        2. …
+        Ожидал: …
+        Получилось: …
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Журнал
+      description: "Файл %APPDATA%\\THR10Editor\\thr10editor.log или «Журнал MIDI» → «Копировать» (Ctrl+J). Можно приложить скриншот."
+      render: text
