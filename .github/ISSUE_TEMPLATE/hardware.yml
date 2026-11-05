@@ -1,0 +1,34 @@
+name: Проверка на комбике
+description: Результаты чек-листа docs/HARDWARE_TEST.md на реальном THR
+labels: [hardware]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Модель комбика
+      placeholder: "THR10 / THR10C / THR10X / THR5 / THR5A"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Версия программы
+      placeholder: "1.3.0"
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Результаты по пунктам чек-листа
+      description: ✅ работает / ❌ не работает / ⚠️ работает не так — номер пункта и комментарий
+      placeholder: |
+        1.1 ✅
+        1.4 ⚠️ громкость упала, но …
+    validations:
+      required: true
+  - type: textarea
+    id: probe
+    attributes:
+      label: Лог THR10Probe
+      description: Содержимое файла thr_probe_*.log (запуск THR10Probe.exe — пункт 1 чек-листа)
+      render: text
